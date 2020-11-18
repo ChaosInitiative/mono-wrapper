@@ -1,0 +1,10 @@
+*.exe
+*.pdb
+*.dll
+mono-tst
+dotnet-tst
+cmake-build*
+build*
+.idea
+.vscode
+mono_crash*
