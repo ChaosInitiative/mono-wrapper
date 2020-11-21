@@ -1,6 +1,6 @@
 project(cspoc C CXX)
 
-set(SRCS src/mono/Main.cpp)
+set(SRCS src/mono/Main.cpp src/mono/MonoWrapper.cpp)
 
 include_directories(/usr/lib/pkgconfig/../../include/mono-2.0 )
 
