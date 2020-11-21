@@ -4,12 +4,12 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{A99CCCEA-34DE-4FF5-B182-F3E7FCBB79D1}</ProjectGuid>
-    <OutputType>Exe</OutputType>
+    <ProjectGuid>{43EF9B4C-A8E9-47AC-BD8D-78B444FCF9F6}</ProjectGuid>
+    <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>ChaosScriptPOC_NETFRAMEWORK</RootNamespace>
-    <AssemblyName>ChaosScriptPOC_NETFRAMEWORK</AssemblyName>
-    <TargetFrameworkVersion>v4.6</TargetFrameworkVersion>
+    <RootNamespace>ScriptSystem</RootNamespace>
+    <AssemblyName>ScriptSystem</AssemblyName>
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
@@ -38,10 +38,10 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="EventAttribute.cs" />
-    <Compile Include="Program.cs" />
+    <Compile Include="Events.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="ScriptLoader.cs" />
+    <Compile Include="Script.cs" />
+    <Compile Include="ScriptCompiler.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
