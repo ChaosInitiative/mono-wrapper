@@ -5,7 +5,7 @@ namespace ScriptSystem.Events
     [AttributeUsage(AttributeTargets.Method)]
     public class Event : System.Attribute
     {
-        private string EventName;
+        internal string EventName;
 
         Event(string ev)
         {
