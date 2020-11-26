@@ -10,6 +10,7 @@
 #include "MonoWrapper.h"
 
 #include <assert.h>
+#include <string.h>
 
 
 //================================================================//
@@ -31,6 +32,16 @@ ManagedType::ManagedType(MonoType* type) :
 bool ManagedType::Equals(const ManagedType* other) const
 {
 	return mono_type_get_type(m_type) == mono_type_get_type(other->m_type);
+}
+
+const std::string& ManagedType::Name() const
+{
+	if(m_name.empty()) {
+		char* c = mono_type_get_name(m_type);
+		m_name.copy(c, strlen(c));
+		mono_free(c);
+	}
+	return m_name;
 }
 
 

@@ -29,6 +29,7 @@ private:
 	bool m_isVoid : 1;
 	bool m_isRef : 1;
 	bool m_isPtr : 1;
+	std::string m_name;
 protected:
 	ManagedType(MonoType* type);
 
@@ -44,6 +45,8 @@ public:
 	bool IsPtr() const { return m_isPtr; };
 	
 	bool Equals(const ManagedType* other) const;
+
+	[[nodiscard]] const std::string& Name() const; 
 };
 
 
