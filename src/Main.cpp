@@ -297,79 +297,10 @@ int main(int argc, char** argv)
 
 	ManagedScriptContext* ctx = scriptSystem.CreateContext(gLibraryName.c_str());
 
+	ManagedClass* cls = ctx->FindClass("ScriptSystem", "Script");
 
-
-
-
-
-#if 0
-	mono_config_parse("mono-config");
-
-	printf("Loading %s\n", gLibraryName.c_str());
-	printf("JIT init\n");
-	MonoDomain* domain = mono_jit_init(gLibraryName.c_str());
-
-	if(!domain)
-	{
-		printf("Jit init failed\n");
-		exit(1);
+	if(!cls) { 
+		printf("Unable to find class!\n");
 	}
-
-	printf("Assembly load start\n");
-	MonoAssembly* assembly = mono_domain_assembly_open(domain, gLibraryName.c_str());
-
-	if(!assembly)
-	{
-		printf("Assembly load failed.\n");
-		exit(1);
-	}
-
-	const char* _argv[] = {
-		"A", "B"
-	};
-	printf("Exec attempt start\n");
-	int ret = mono_jit_exec(domain, assembly, 1, &argv[1]);
-	printf("Execution complete with code %u\n", ret);
-
-
-	MonoImage* img = mono_assembly_get_image(assembly);
-	if(!img)
-	{
-		printf("NOT able to get image from assembly\n");
-		exit(1);
-	}
-	printf("Loaded assembly\n");
-	MonoClass* cls = mono_class_from_name(img, "ChaosScriptPOC_NETFRAMEWORK", "AnotherTest");
-
-	if(!cls)
-	{
-		printf("NOT able to find AnotherTest class\n");
-		exit(1);
-	}
-	printf("Loaded class\n");
-	MonoMethodDesc * desc = mono_method_desc_new("ChaosScriptPOC_NETFRAMEWORK.AnotherTest:Test", true);
-	if(!desc)
-	{
-		printf("Failed to create desc.\n");
-		exit(1);
-	}
-	printf("Created method desc\n");
-	MonoMethod* ourMethod = mono_method_desc_search_in_class(desc, cls);
-
-	if(!ourMethod)
-	{
-		printf("Not able to find Test!\n");
-		exit(1);
-	}
-
-	printf("Trying to invoke...\n");
-	int tst_num = 69;
-	void* args[1] = {&tst_num};
-	mono_runtime_invoke(ourMethod, NULL, args, NULL);
-
-
-	printf("Domain cleanup\n");
-	mono_jit_cleanup(domain);
-#endif
 
 }

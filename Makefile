@@ -3,7 +3,7 @@ CXX?=g++
 
 DEFINES+=
 LIBS+=-lm -ldl -lc -lrt
-CXXFLAGS+=-std=c++17 $(LIBS) $(DEFINES) -g -Og -m64
+CXXFLAGS+=-std=c++17 $(LIBS) $(DEFINES) -g -Og -m64 -std=c++17
 SRC_MONO=$(wildcard src/*.cpp)
 
 all:

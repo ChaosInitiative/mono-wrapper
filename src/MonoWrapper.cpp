@@ -23,7 +23,8 @@ ManagedMethod::ManagedMethod(MonoMethod *method, ManagedClass *cls) :
 	m_attrInfo = mono_custom_attrs_from_method(method);
 	m_token = mono_method_get_token(method);
 	m_class = cls;
-	m_signature = mono_method_get_signature(m_method, m_class->m_assembly->m_image, m_token);
+	if(m_token)
+		m_signature = mono_method_get_signature(m_method, m_class->m_assembly->m_image, m_token);
 	if (!m_attrInfo)
 	{
 		return;
@@ -80,9 +81,11 @@ ManagedClass::ManagedClass(ManagedAssembly *assembly, const std::string &ns, con
 	m_attrInfo = mono_custom_attrs_from_class(m_class);
 
 	/* If there is no class name or namespace, something is fucky */
-	if (!cls.empty())
+	if (!cls.empty() && m_attrInfo)
 	{
-		m_attributes.push_back(new ManagedObject(mono_custom_attrs_get_attr(m_attrInfo, m_class), this));
+		if(mono_custom_attrs_has_attr(m_attrInfo, m_class)) {
+			m_attributes.push_back(new ManagedObject(mono_custom_attrs_get_attr(m_attrInfo, m_class), this));
+		}
 	}
 
 	PopulateReflectionInfo();
@@ -97,9 +100,11 @@ ManagedClass::ManagedClass(ManagedAssembly *assembly, MonoClass *_cls, const std
 	m_attrInfo = mono_custom_attrs_from_class(m_class);
 
 	/* If there is no class name or namespace, something is fucky */
-	if (!cls.empty())
+	if (!cls.empty() && m_attrInfo)
 	{
-		m_attributes.push_back(new ManagedObject(mono_custom_attrs_get_attr(m_attrInfo, m_class), this));
+		if(mono_custom_attrs_has_attr(m_attrInfo, m_class)) {
+			m_attributes.push_back(new ManagedObject(mono_custom_attrs_get_attr(m_attrInfo, m_class), this));
+		}
 	}
 
 	PopulateReflectionInfo();
@@ -149,6 +154,11 @@ ManagedScriptContext::ManagedScriptContext(const std::string& baseImage) :
 	m_baseImage(baseImage)
 {
 	m_domain = mono_jit_init(baseImage.c_str());
+	ManagedAssembly baseDesc;
+	baseDesc.m_assembly = mono_domain_assembly_open(m_domain, baseImage.c_str());
+	baseDesc.m_image = mono_assembly_get_image(baseDesc.m_assembly);
+	baseDesc.m_path = baseImage;
+	m_loadedAssemblies.push_back(baseDesc);
 }
 
 ManagedScriptContext::~ManagedScriptContext()
