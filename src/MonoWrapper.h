@@ -21,6 +21,31 @@ private:
 public:
 };
 
+class ManagedType
+{
+private:
+	MonoType* m_type;
+	bool m_isStruct : 1;
+	bool m_isVoid : 1;
+	bool m_isRef : 1;
+	bool m_isPtr : 1;
+protected:
+	ManagedType(MonoType* type);
+
+	friend class ManagedMethod;
+	friend class ManagedObject;
+public:
+	bool IsStruct() const { m_isStruct; };
+
+	bool IsVoid() const { return m_isVoid; };
+
+	bool IsRef() const { return m_isRef; };
+
+	bool IsPtr() const { return m_isPtr; };
+	
+	bool Equals(const ManagedType* other) const;
+};
+
 
 class ManagedObject
 {
@@ -53,6 +78,12 @@ private:
 	MonoMethodSignature* m_signature;
 	bool m_populated;
 	uint32_t m_token;
+	std::string m_name;
+	std::string m_fullyQualifiedName;
+	int m_paramCount;
+
+	ManagedType* m_returnType;
+	std::vector<ManagedType*> m_params;
 
 public:
 	ManagedMethod() = delete;
@@ -70,11 +101,15 @@ protected:
 
 
 public:
-	ManagedAssembly* Assembly() const;
+	[[nodiscard]] ManagedAssembly* Assembly() const;
 
+	[[nodiscard]] ManagedClass* Class() const;
 
+	[[nodiscard]] const std::vector<ManagedObject*>& Attributes() const { return m_attributes; }
 
+	[[nodiscard]] const std::string& Name() const { return m_name; };
 
+	[[nodiscard]] int ParamCount() const { return m_paramCount; };
 };
 
 class ManagedField

@@ -9,6 +9,31 @@
 
 #include "MonoWrapper.h"
 
+#include <assert.h>
+
+
+//================================================================//
+//
+// Managed Type
+//
+//================================================================//
+
+
+ManagedType::ManagedType(MonoType* type) :
+	m_type(type)
+{
+	m_isVoid = mono_type_is_void(type);
+	m_isStruct = mono_type_is_struct(type);
+	m_isRef = mono_type_is_reference(type);
+	m_isPtr = mono_type_is_pointer(type);
+}
+
+bool ManagedType::Equals(const ManagedType* other) const
+{
+	return mono_type_get_type(m_type) == mono_type_get_type(other->m_type);
+}
+
+
 //================================================================//
 //
 // Managed Method
@@ -23,8 +48,16 @@ ManagedMethod::ManagedMethod(MonoMethod *method, ManagedClass *cls) :
 	m_attrInfo = mono_custom_attrs_from_method(method);
 	m_token = mono_method_get_token(method);
 	m_class = cls;
-	if(m_token)
+	if(m_token) {
 		m_signature = mono_method_get_signature(m_method, m_class->m_assembly->m_image, m_token);
+		assert(m_signature);
+	}
+
+	m_name = mono_method_get_name(m_method);
+	m_paramCount = mono_signature_get_param_count(m_signature);
+	
+	m_returnType = new ManagedType(mono_signature_get_return_type(m_signature));
+
 	if (!m_attrInfo)
 	{
 		return;
@@ -36,11 +69,22 @@ ManagedMethod::~ManagedMethod()
 {
 	if (m_attrInfo)
 		mono_custom_attrs_free(m_attrInfo);
+	if(m_returnType)
+		delete m_returnType;
+	for(auto x : m_params) {
+		delete x;
+	}
+	m_params.clear();
 }
 
 ManagedAssembly *ManagedMethod::Assembly() const
 {
-	return nullptr;
+	return m_class->m_assembly;
+}
+
+ManagedClass* ManagedMethod::Class() const
+{
+	return m_class;
 }
 
 //================================================================//
@@ -95,7 +139,8 @@ ManagedClass::ManagedClass(ManagedAssembly *assembly, MonoClass *_cls, const std
 	m_className(cls),
 	m_class(_cls),
 	m_namespaceName(ns),
-	m_populated(false)
+	m_populated(false),
+	m_assembly(assembly)
 {
 	m_attrInfo = mono_custom_attrs_from_class(m_class);
 
@@ -121,6 +166,7 @@ void ManagedClass::PopulateReflectionInfo()
 {
 	if (m_populated) return;
 	void *iter = nullptr;
+
 	MonoMethod *method;
 	while ((method = mono_class_get_methods(m_class, &iter)))
 	{

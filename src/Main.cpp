@@ -303,4 +303,9 @@ int main(int argc, char** argv)
 		printf("Unable to find class!\n");
 	}
 
+	auto methods = cls->Methods();
+	for(auto& m : methods) {
+		printf("\t%s\n", m->Name().c_str());
+	}
+
 }
