@@ -11,10 +11,10 @@
             "-D_REENTRANT",
             "-o",
             "mono-tst",
-            "src/mono/Main.cpp"
+            "src/Main.cpp"
         ],
         "directory": "/home/jeremy/Desktop/Projects/ChaosScriptPOC",
-        "file": "src/mono/Main.cpp"
+        "file": "src/Main.cpp"
     },
     {
         "arguments": [
@@ -28,9 +28,9 @@
             "-D_REENTRANT",
             "-o",
             "mono-tst",
-            "src/mono/MonoWrapper.cpp"
+            "src/MonoWrapper.cpp"
         ],
         "directory": "/home/jeremy/Desktop/Projects/ChaosScriptPOC",
-        "file": "src/mono/MonoWrapper.cpp"
+        "file": "src/MonoWrapper.cpp"
     }
 ]
