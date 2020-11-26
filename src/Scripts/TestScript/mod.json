@@ -1,0 +1,17 @@
+{
+  "title": "Testing Script",
+  "name": "test-script",
+  "authors": [
+    "jjl77"
+  ],
+  "website": "www.portal2communityedition.com",
+  "license": "GPLv3",
+  "description": "A simple test script for testing stuff!",
+  "srcdir": "src",
+  "assets": [
+
+  ],
+  "dependencies": [
+
+  ]
+}

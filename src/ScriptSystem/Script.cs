@@ -45,7 +45,7 @@ namespace ScriptSystem
 		/* List of addon dependencies we have */
 		public IList<string> dependencies { get; set; }
 	}
-
+	
 	public class Script
 	{
 		private ScriptConfigFile m_config;
@@ -65,7 +65,7 @@ namespace ScriptSystem
 		/* Method references and such */
 		private Dictionary<string, MethodInfo> _eventHandlers;
 		
-		public Script(string configFile, string buildDir, int permissionLevel, bool watchFiles = false)
+		protected Script(string configFile, string buildDir, int permissionLevel, bool watchFiles = false)
 		{
 			m_permissionLevel = permissionLevel;
 			m_buildDir = buildDir;
@@ -94,8 +94,11 @@ namespace ScriptSystem
 				_watcher.IncludeSubdirectories = true;
 				_watcher.EnableRaisingEvents = true;
 			}
-			
-			
+		}
+
+		public static Script LoadScript(string cfg, string buildDir, int permLvl, bool watchFiles = false)
+		{
+			return new Script(cfg, buildDir, permLvl, watchFiles);
 		}
 
 		public bool Compile()
