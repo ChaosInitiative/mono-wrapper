@@ -1,0 +1,36 @@
+[
+    {
+        "arguments": [
+            "g++",
+            "-c",
+            "-std=c++17",
+            "-g",
+            "-Og",
+            "-m64",
+            "-I/usr/lib/pkgconfig/../../include/mono-2.0",
+            "-D_REENTRANT",
+            "-o",
+            "mono-tst",
+            "src/mono/Main.cpp"
+        ],
+        "directory": "/home/jeremy/Desktop/Projects/ChaosScriptPOC",
+        "file": "src/mono/Main.cpp"
+    },
+    {
+        "arguments": [
+            "g++",
+            "-c",
+            "-std=c++17",
+            "-g",
+            "-Og",
+            "-m64",
+            "-I/usr/lib/pkgconfig/../../include/mono-2.0",
+            "-D_REENTRANT",
+            "-o",
+            "mono-tst",
+            "src/mono/MonoWrapper.cpp"
+        ],
+        "directory": "/home/jeremy/Desktop/Projects/ChaosScriptPOC",
+        "file": "src/mono/MonoWrapper.cpp"
+    }
+]

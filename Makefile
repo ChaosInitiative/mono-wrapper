@@ -9,4 +9,6 @@ SRC_DOTNET=$(wildcard src/netcore/*.cpp)
 
 all:
 	g++ $(SRC_MONO) $(CXXFLAGS) `pkg-config --cflags --libs mono-2` -o mono-tst
-	g++ $(SRC_DOTNET) $(CXXFLAGS) -o dotnet-tst
+
+clean: 
+	rm mono-tst
