@@ -6,6 +6,11 @@
 #include <mono/metadata/class.h>
 #include <mono/metadata/reflection.h>
 #include <mono/metadata/mono-debug.h>
+#include <mono/metadata/profiler.h>
+#include <mono/metadata/mono-debug.h>
+#include <mono/metadata/mono-gc.h>
+#include <mono/metadata/threads.h>
+#include <mono/metadata/debug-helpers.h>
 
 #include "MonoWrapper.h"
 
@@ -55,7 +60,7 @@ void ManagedAssembly::GetReferencedTypes(std::vector<std::string>& refList)
 
 	const MonoTableInfo* tab = mono_image_get_table_info(m_image, MONO_TABLE_TYPEREF);
 	int rows = mono_table_info_get_rows(tab);
-	//refList.reserve(rows);
+	/* Parse all of the referenced types, and add them to the refList */
 	for(int i = 0; i < rows; i++) {
 		uint32_t cols[MONO_TYPEREF_SIZE];
 		mono_metadata_decode_row(tab, i, cols, MONO_TYPEREF_SIZE);
@@ -85,6 +90,18 @@ bool ManagedAssembly::ValidateAgainstWhitelist(const std::vector<std::string>& w
 	return true;
 }
 
+void ManagedAssembly::DisposeReflectionInfo()
+{
+	for(auto& kvPair : m_classes) {
+		delete kvPair.second;
+	}
+	m_classes.clear();
+}
+
+void ManagedAssembly::Unload()
+{
+	this->DisposeReflectionInfo();
+}
 
 //================================================================//
 //
@@ -293,6 +310,13 @@ ManagedScriptContext::ManagedScriptContext(const std::string& baseImage) :
 
 ManagedScriptContext::~ManagedScriptContext()
 {
+	for(auto& a : m_loadedAssemblies) 
+	{
+		if(a->m_image)
+			mono_image_close(a->m_image);
+		if(a->m_assembly)
+			mono_assembly_close(a->m_assembly);
+	}
 	if(m_domain)
 		mono_domain_unload(m_domain);
 }
@@ -401,7 +425,7 @@ void ManagedScriptContext::PopulateReflectionInfo()
 }
 
 
-bool ManagedScriptContext::ValidateAgainstWhitelist(const std::vector<std::string> whitelist)
+bool ManagedScriptContext::ValidateAgainstWhitelist(const std::vector<std::string>& whitelist)
 {
 	for(auto& a : m_loadedAssemblies) {
 		if(!a->ValidateAgainstWhitelist(whitelist))
@@ -424,7 +448,11 @@ ManagedScriptSystem::ManagedScriptSystem()
 
 ManagedScriptSystem::~ManagedScriptSystem()
 {
-
+	// contexts should be freed before shutdown
+	assert(m_contexts.size() == 0);
+	for(auto c : m_contexts) { 
+		delete (c);
+	}
 }
 
 ManagedScriptContext* ManagedScriptSystem::CreateContext(const char* image)
@@ -445,4 +473,14 @@ void ManagedScriptSystem::DestroyContext(ManagedScriptContext* ctx)
 			return;
 		}
 	}
+}
+
+uint64_t ManagedScriptSystem::HeapSize() const
+{
+	return mono_gc_get_heap_size();
+}
+
+uint64_t ManagedScriptSystem::UsedHeapSize() const
+{
+	return mono_gc_get_used_size();
 }

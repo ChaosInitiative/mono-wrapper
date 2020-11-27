@@ -7,8 +7,76 @@
 #include <unordered_map>
 #include <list>
 
-class ManagedAssembly
+template<class T>
+class ManagedHandle
 {
+private:
+	T* m_object;
+	bool m_valid;
+
+protected:
+	void Invalidate() { m_valid = false; }
+	void Validate() { m_valid = true; }
+	friend T;
+
+public:
+	ManagedHandle(T* obj) :
+		m_object(obj),
+		m_valid(false)
+	{
+		m_object->AttachHandle(this);
+	}
+
+	~ManagedHandle()
+	{
+		if(m_object && m_valid)
+			m_object->DetachHandle(this);
+	}
+
+	ManagedHandle() = delete;
+
+	bool Valid() const { return m_valid; }
+
+	T& operator*() { return *m_object; };
+
+	T& operator->() { return *m_object; }
+};
+
+//==============================================================================================//
+// ManagedBase
+//      base class for all Managed types
+//==============================================================================================//
+template<class T>
+class ManagedBase
+{
+public:
+	typedef ManagedHandle<T>* HandleT;
+	friend ManagedHandle<T>;
+
+	HandleT m_handle;
+
+	void AttachHandle(HandleT handle)
+	{
+		handle->Validate();
+		m_handle = handle;
+	}
+
+	void DetachHandle(HandleT handle)
+	{
+		handle->Invalidate();
+		m_handle = nullptr;
+	}
+
+};
+
+//==============================================================================================//
+// ManagedAssembly
+//      Represents an Assembly object
+//==============================================================================================//
+class ManagedAssembly : protected ManagedBase<ManagedAssembly>
+{
+private:
+	typedef ManagedHandle<ManagedAssembly>* HandleT;
 private:
 	MonoAssembly* m_assembly;
 	MonoImage* m_image;
@@ -19,6 +87,8 @@ private:
 
 public:
 	ManagedAssembly() = delete;
+	ManagedAssembly(ManagedAssembly&) = delete;
+	ManagedAssembly(ManagedAssembly&&) = delete;
 
 protected:
 	explicit ManagedAssembly(class ManagedScriptContext* ctx, const std::string& path, MonoImage* img, MonoAssembly* ass);
@@ -28,14 +98,24 @@ protected:
 	friend class ManagedMethod;
 
 	void PopulateReflectionInfo();
+	void DisposeReflectionInfo();
 
 public:
 	void GetReferencedTypes(std::vector<std::string>& refList);
 
 	bool ValidateAgainstWhitelist(const std::vector<std::string>& whiteList);
+
+	/* Invalidates all internal data and unloads the assembly */
+	/* Delete the object after this */
+	void Unload();
 };
 
-class ManagedType
+
+//==============================================================================================//
+// ManagedType
+//      Represents a simple mono type
+//==============================================================================================//
+class ManagedType : protected ManagedBase<ManagedType>
 {
 private:
 	MonoType* m_type;
@@ -44,6 +124,11 @@ private:
 	bool m_isRef : 1;
 	bool m_isPtr : 1;
 	std::string m_name;
+public:
+	ManagedType() = delete;
+	ManagedType(ManagedType&) = delete;
+	ManagedType(ManagedType&&) = delete;
+
 protected:
 	ManagedType(MonoType* type);
 
@@ -64,13 +149,20 @@ public:
 };
 
 
-class ManagedObject
+//==============================================================================================//
+// ManagedObject
+//      Wrapper around a mono object
+//==============================================================================================//
+class ManagedObject : protected ManagedBase<ManagedObject>
 {
 private:
 	MonoObject* m_obj;
 	class ManagedClass* m_class;
 
 public:
+	ManagedObject() = delete;
+	ManagedObject(ManagedObject&) = delete;
+	ManagedObject(ManagedObject&&) = delete;
 
 	ManagedObject(MonoObject* obj, class ManagedClass* cls)
 	{
@@ -78,14 +170,17 @@ public:
 		m_class = cls;
 	}
 
-
 	[[nodiscard]] const ManagedClass& Class() const { return *m_class; }
 
 	[[nodiscard]] const MonoObject* InternalObject() const { return m_obj; }
 
 };
 
-class ManagedMethod
+//==============================================================================================//
+// ManagedMethod
+//      Represents a MonoMethod object, must be a part of a class
+//==============================================================================================//
+class ManagedMethod : protected ManagedBase<ManagedMethod>
 {
 private:
 	MonoMethod* m_method;
@@ -102,12 +197,15 @@ private:
 	ManagedType* m_returnType;
 	std::vector<ManagedType*> m_params;
 
+	friend class ManagedClass;
+	friend ManagedHandle<ManagedMethod>;
+
 public:
 	ManagedMethod() = delete;
+	ManagedMethod(ManagedMethod&) = delete;
+	ManagedMethod(ManagedMethod&&) = delete;
 
 protected:
-
-
 	explicit ManagedMethod(MonoMethod* method, ManagedClass* cls);
 
 	~ManagedMethod();
@@ -129,11 +227,21 @@ public:
 	[[nodiscard]] int ParamCount() const { return m_paramCount; };
 };
 
-class ManagedField
+//==============================================================================================//
+// ManagedField
+//      Represents a MonoField, or a field in a class
+//==============================================================================================//
+class ManagedField : protected ManagedBase<ManagedField>
 {
 private:
 	MonoClassField* m_field;
 	class ManagedClass* m_class;
+
+public:
+	ManagedField() = delete;
+	ManagedField(ManagedField&) = delete;
+	ManagedField(ManagedField&&) = delete;
+
 protected:
 
 	explicit ManagedField(MonoClassField* fld, class ManagedClass* cls);
@@ -143,12 +251,20 @@ protected:
 	friend class ManagedProperty;
 };
 
-class ManagedProperty
+//==============================================================================================//
+// ManagedProperty
+//      Represents a MonoProperty
+//==============================================================================================//
+class ManagedProperty : protected ManagedBase<ManagedProperty>
 {
 private:
 	MonoProperty* m_property;
 	class ManagedClass* m_class;
 
+public:
+	ManagedProperty() = delete;
+	ManagedProperty(ManagedProperty&) = delete;
+	ManagedProperty(ManagedProperty&&) = delete;
 protected:
 
 	ManagedProperty(MonoProperty* prop, ManagedClass* cls) :
@@ -168,7 +284,11 @@ public:
 	[[nodiscard]] const ManagedClass& Class() const { return *m_class; }
 };
 
-class ManagedClass
+//==============================================================================================//
+// ManagedClass
+//      Represents a MonoClass object and stores cached info about it
+//==============================================================================================//
+class ManagedClass : protected ManagedBase<ManagedClass>
 {
 private:
 	std::vector<class ManagedMethod*> m_methods;
@@ -184,9 +304,9 @@ private:
 
 	friend class ManagedScriptContext;
 	friend class ManagedMethod;
+	friend class ManagedAssembly;
 
 protected:
-
 	ManagedClass(ManagedAssembly* assembly, const std::string& ns, const std::string& cls);
 	ManagedClass(ManagedAssembly* assembly, MonoClass* _cls, const std::string& ns, const std::string& cls);
 	~ManagedClass();
@@ -195,6 +315,8 @@ protected:
 
 public:
 	ManagedClass() = delete;
+	ManagedClass(ManagedClass&& c) = delete;
+	ManagedClass(ManagedClass&) = delete;
 
 	[[nodiscard]] std::string_view NamespaceName() const { return m_namespaceName; };
 
@@ -210,6 +332,11 @@ public:
 
 };
 
+/* NOTE: this class cannot have a handle pointed at it */
+//==============================================================================================//
+// ManagedScriptContext
+//      Handles execution of a "script"
+//==============================================================================================//
 class ManagedScriptContext
 {
 private:
@@ -220,10 +347,11 @@ private:
 
 public:
 	ManagedScriptContext() = delete;
+	ManagedScriptContext(ManagedScriptContext&) = delete;
+	ManagedScriptContext(ManagedScriptContext&&) = delete;
 
 protected:
 	friend class ManagedScriptSystem;
-
 
 	explicit ManagedScriptContext(const std::string& baseImage);
 	~ManagedScriptContext();
@@ -231,7 +359,6 @@ protected:
 	void PopulateReflectionInfo();
 
 public:
-
 	bool LoadAssembly(const char* path);
 
 	bool UnloadAssembly(const std::string& name);
@@ -248,7 +375,7 @@ public:
 	/* WARNING: this will invalidate your handles! */
 	void ClearReflectionInfo();
 
-	bool ValidateAgainstWhitelist(const std::vector<std::string> whitelist);
+	bool ValidateAgainstWhitelist(const std::vector<std::string> &whitelist);
 };
 
 class ManagedScriptSystem
@@ -265,5 +392,7 @@ public:
 
 	[[nodiscard]] int NumActiveContexts() const { return m_contexts.size(); };
 
+	[[nodiscard]] uint64_t HeapSize() const;
 
+	[[nodiscard]] uint64_t UsedHeapSize() const;
 };
