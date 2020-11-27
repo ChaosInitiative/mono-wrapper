@@ -14,8 +14,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
+
+#ifndef _WIN32 
 #include <time.h>
 #include <sys/resource.h>
+#endif
 
 class ResourceContext
 {
@@ -34,6 +37,7 @@ public:
 
 	void BeginPoint(const char* name)
 	{
+#ifndef _WIN32 
 		activePoint.name = name;
 		timespec tp;
 		clock_gettime(CLOCK_MONOTONIC, &tp);
@@ -43,10 +47,12 @@ public:
 		rusage usage;
 		getrusage(RUSAGE_SELF, &usage);
 		activePoint.rssSize = usage.ru_idrss;
+#endif 
 	}
 
 	void EndPoint()
 	{
+#ifndef _WIN32 
 		timespec tp;
 		clock_gettime(CLOCK_MONOTONIC, &tp);
 		unsigned long long t = tp.tv_sec * 1000000000;
@@ -61,15 +67,18 @@ public:
 
 		m_entries.push_back(activePoint);
 		memset(&activePoint, 0, sizeof(Entry_t));
+#endif 
 	}
 
 
 	void Report()
 	{
+#ifndef _WIN32 
 		for(Entry_t e : m_entries) {
 			printf("\nTest: %s\n", e.name);
 			printf("\tTime: %llu ns (%f ms)\n", e.time, (e.time / 1e6f));
 			printf("\tMem Usage Change: %f kb\n", e.rssSize / 1e3f);
 		}
+#endif 
 	}
 };
