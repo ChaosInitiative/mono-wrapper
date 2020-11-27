@@ -261,6 +261,8 @@ public:
 	[[nodiscard]] const std::string& Name() const { return m_name; };
 
 	[[nodiscard]] int ParamCount() const { return m_paramCount; };
+
+	MonoMethod* RawMethod() { return m_method; };
 };
 
 //==============================================================================================//
@@ -368,6 +370,8 @@ public:
 
 	[[nodiscard]] const std::vector<class ManagedProperty*> Properties() const { return m_properties; };
 
+	ManagedMethod* FindMethod(const std::string& name);
+
 };
 
 /* NOTE: this class cannot have a handle pointed at it */
@@ -387,6 +391,8 @@ public:
 	ManagedScriptContext() = delete;
 	ManagedScriptContext(ManagedScriptContext&) = delete;
 	ManagedScriptContext(ManagedScriptContext&&) = delete;
+
+	friend class ManagedCompiler;
 
 protected:
 	friend class ManagedScriptSystem;
@@ -416,6 +422,10 @@ public:
 	bool ValidateAgainstWhitelist(const std::vector<std::string> &whitelist);
 };
 
+//==============================================================================================//
+// ManagedScriptSystem
+//      Handles execution of a "script"
+//==============================================================================================//
 class ManagedScriptSystem
 {
 private:
@@ -433,4 +443,29 @@ public:
 	[[nodiscard]] uint64_t HeapSize() const;
 
 	[[nodiscard]] uint64_t UsedHeapSize() const;
+
+	class ManagedCompiler* CreateCompiler(const std::string& pathToCompilerBinary);
+	void DestoryCompiler(ManagedCompiler* c);
+};
+
+
+//==============================================================================================//
+// ManagedCompiler
+//      Handles the compilation of new code
+//==============================================================================================//
+class ManagedCompiler
+{
+private:
+	ManagedScriptContext* m_ctx;
+	ManagedScriptSystem* m_sys;
+	ManagedClass* m_compilerClass;
+	ManagedMethod* m_compileMethod;
+	friend ManagedScriptSystem;
+protected:
+	ManagedCompiler();
+	~ManagedCompiler();
+	void Setup();
+public:
+	bool Compile(const std::string& buildDir, const std::string& outDir, int langVer);
+
 };

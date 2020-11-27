@@ -294,17 +294,6 @@ void ManagedClass::PopulateReflectionInfo()
 	if(m_valid) return;
 	void *iter = nullptr;
 
-	/* If we are invalid and handles are dangling, it means we've undergone a reload */
-	if(m_attrInfo) {
-		mono_custom_attrs_free(m_attrInfo);
-		m_attrInfo = mono_custom_attrs_from_class(m_class);
-	}
-
-	/* Get all of the attributes */
-	if(mono_custom_attrs_has_attr(m_attrInfo, m_class)) {
-		m_attributes.push_back(new ManagedObject(mono_custom_attrs_get_attr(m_attrInfo, m_class), this));
-	}
-
 	MonoMethod *method;
 	while ((method = mono_class_get_methods(m_class, &iter)))
 	{
@@ -336,8 +325,17 @@ void ManagedClass::InvalidateHandle()
 	for(auto& meth : m_methods) {
 		meth->InvalidateHandle();
 	}
-
 }
+
+// TODO: Investigate perf of this, maybe use a hashmap? Might just be faster to not though.
+ManagedMethod *ManagedClass::FindMethod(const std::string &name)
+{
+	for(auto m : m_methods) {
+		if(m->m_name == name) return m;
+	}
+	return nullptr;
+}
+
 
 
 
@@ -351,6 +349,7 @@ ManagedScriptContext::ManagedScriptContext(const std::string& baseImage) :
 	m_baseImage(baseImage)
 {
 	m_domain = mono_jit_init(baseImage.c_str());
+	//m_domain = mono_domain_create();
 	MonoAssembly* ass = mono_domain_assembly_open(m_domain, baseImage.c_str());
 	MonoImage* img = mono_assembly_get_image(ass);
 	ManagedAssembly* newass = new ManagedAssembly(this, baseImage, img, ass);
@@ -533,4 +532,56 @@ uint64_t ManagedScriptSystem::HeapSize() const
 uint64_t ManagedScriptSystem::UsedHeapSize() const
 {
 	return mono_gc_get_used_size();
+}
+
+class ManagedCompiler *ManagedScriptSystem::CreateCompiler(const std::string& cbin)
+{
+	ManagedCompiler* c = new ManagedCompiler();
+	c->m_sys = this;
+	c->m_ctx = CreateContext(cbin.c_str());
+	c->Setup();
+	return c;
+}
+
+void ManagedScriptSystem::DestoryCompiler(ManagedCompiler *c)
+{
+	DestroyContext(c->m_ctx);
+}
+
+//================================================================//
+//
+// Managed Compiler
+//
+//================================================================//
+
+ManagedCompiler::ManagedCompiler()
+{
+
+}
+
+ManagedCompiler::~ManagedCompiler()
+{
+
+}
+
+void ManagedCompiler::Setup()
+{
+	m_compilerClass = m_ctx->FindClass("ScriptCompiler", "Compiler");
+	m_compileMethod = m_compilerClass->FindMethod("Compile");
+}
+
+
+bool ManagedCompiler::Compile(const std::string &buildDir, const std::string &outFile, int langVer)
+{
+	MonoString* outFileString = mono_string_new(m_ctx->m_domain, outFile.c_str());
+	MonoString* buildDirString = mono_string_new(m_ctx->m_domain, buildDir.c_str());
+
+	void* params[] = {
+		&outFileString,
+		&buildDirString,
+		&langVer
+	};
+	MonoObject* ret = mono_runtime_invoke(m_compileMethod->RawMethod(), nullptr, params, nullptr);
+
+	return ret;
 }
