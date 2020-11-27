@@ -8,55 +8,68 @@
 #pragma once
 
 #include <list>
+#include <vector>
 
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
 #include <time.h>
+#include <sys/resource.h>
 
 class ResourceContext
 {
 private:
-	FILE* m_proc;
-
 	struct Entry_t {
 		unsigned long long time;
 		unsigned long long rssSize;
-		unsigned long long vMemSize;
+		const char* name;
 	};
-	std::list<Entry_t> m_entries;
+	std::vector<Entry_t> m_entries;
+	Entry_t activePoint;
 public:
 	ResourceContext()
 	{
-		m_proc = fopen("/proc/self/status", "r");
-		assert(m_proc);
 	}
 
-	void LogUsage(const char* stage)
+	void BeginPoint(const char* name)
+	{
+		activePoint.name = name;
+		timespec tp;
+		clock_gettime(CLOCK_MONOTONIC, &tp);
+		activePoint.time = tp.tv_sec * 1000000000;
+		activePoint.time += tp.tv_nsec;
+		
+		rusage usage;
+		getrusage(RUSAGE_SELF, &usage);
+		activePoint.rssSize = usage.ru_idrss;
+	}
+
+	void EndPoint()
 	{
 		timespec tp;
 		clock_gettime(CLOCK_MONOTONIC, &tp);
-		Entry_t ent;
-		ent.time = tp.tv_sec * 1000000000;
-		ent.time += tp.tv_nsec;
-		
-		fseek(m_proc, SEEK_SET, 0);
-		char buf[4096];
-		size_t read = fread(&buf, sizeof(buf), 1, m_proc);
+		unsigned long long t = tp.tv_sec * 1000000000;
+		t += tp.tv_nsec;
 
-		for(char* tok = strtok(buf, "\n"); tok; tok = strtok(NULL, "\n")) {
-			if(strncmp(tok, "RssAnon", 7) == 0) {
+		rusage usage;
+		getrusage(RUSAGE_SELF, &usage);
+		auto rss = activePoint.rssSize;
+		auto time = activePoint.time;
+		activePoint.rssSize = usage.ru_idrss - rss;
+		activePoint.time = t - time;
 
-			}
-			else if(strncmp(tok, "VmSize", 6) == 0) {
-				
-			}
-		}
+		m_entries.push_back(activePoint);
+		memset(&activePoint, 0, sizeof(Entry_t));
 	}
+
 
 	void Report()
 	{
-
+		for(Entry_t e : m_entries) {
+			printf("\nTest: %s\n", e.name);
+			printf("\tTime: %llu ns (%f ms)\n", e.time, (e.time / 1e6f));
+			printf("\tMem Usage Change: %f kb\n", e.rssSize / 1e3f);
+		}
 	}
 };

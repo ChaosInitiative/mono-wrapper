@@ -36,7 +36,7 @@ protected:
 	friend class ManagedMethod;
 	friend class ManagedObject;
 public:
-	bool IsStruct() const { m_isStruct; };
+	bool IsStruct() const { return m_isStruct; };
 
 	bool IsVoid() const { return m_isVoid; };
 

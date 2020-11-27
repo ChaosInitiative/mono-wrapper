@@ -9,6 +9,7 @@
 #include <mono/metadata/mono-debug.h>
 
 #include "MonoWrapper.h"
+#include "Metrics.hpp"
 
 #include <string>
 #include <vector>
@@ -16,6 +17,7 @@
 #include <string.h>
 #include <unordered_map>
 #include <list>
+
 
 #include <unistd.h>
 
@@ -295,9 +297,21 @@ int main(int argc, char** argv)
 
 	static ManagedScriptSystem scriptSystem;
 
-	ManagedScriptContext* ctx = scriptSystem.CreateContext(gLibraryName.c_str());
+	ResourceContext* rctx = new ResourceContext();
 
+	rctx->BeginPoint("Initial Create Context");
+	ManagedScriptContext* ctx = scriptSystem.CreateContext(gLibraryName.c_str());
+	rctx->EndPoint();
+
+	rctx->BeginPoint("Initial Find Class");
 	ManagedClass* cls = ctx->FindClass("ScriptSystem", "Script");
+	rctx->EndPoint();
+
+	rctx->BeginPoint("Second Find Class");
+	cls = ctx->FindClass("ScriptSystem", "Script");
+	rctx->EndPoint();
+
+	
 
 	if(!cls) { 
 		printf("Unable to find class!\n");
@@ -308,4 +322,5 @@ int main(int argc, char** argv)
 		printf("\t%s\n", m->Name().c_str());
 	}
 
+	rctx->Report();
 }
