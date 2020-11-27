@@ -14,11 +14,20 @@ private:
 	MonoImage* m_image;
 	std::string m_path;
 	std::unordered_multimap<std::string, class ManagedClass*> m_classes;
+	bool m_populated;
+	class ManagedScriptContext* m_ctx;
+
+public:
+	ManagedAssembly() = delete;
+
+protected:
+	explicit ManagedAssembly(class ManagedScriptContext* ctx, const std::string& path, MonoImage* img, MonoAssembly* ass);
 
 	friend class ManagedScriptContext;
 	friend class ManagedClass;
 	friend class ManagedMethod;
 public:
+	void PopulateReflectionInfo();
 };
 
 class ManagedType
@@ -200,7 +209,7 @@ class ManagedScriptContext
 {
 private:
 
-	std::list<ManagedAssembly> m_loadedAssemblies;
+	std::list<ManagedAssembly*> m_loadedAssemblies;
 	MonoDomain* m_domain;
 	std::string m_baseImage;
 
@@ -213,6 +222,8 @@ protected:
 
 	explicit ManagedScriptContext(const std::string& baseImage);
 	~ManagedScriptContext();
+
+	void PopulateReflectionInfo();
 
 public:
 

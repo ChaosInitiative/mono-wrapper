@@ -15,6 +15,41 @@
 
 //================================================================//
 //
+// Managed Assembly
+//
+//================================================================//
+ManagedAssembly::ManagedAssembly(ManagedScriptContext* ctx, const std::string& name, MonoImage* img, MonoAssembly* ass) :
+	m_ctx(ctx),
+	m_path(name),
+	m_image(img),
+	m_assembly(ass),
+	m_populated(false)
+{
+
+}
+
+void ManagedAssembly::PopulateReflectionInfo()
+{
+	assert(m_ctx);
+	assert(m_image);
+	assert(m_assembly);
+	if(m_populated) return;
+	m_populated = true;
+	const MonoTableInfo* tab = mono_image_get_table_info(m_image, MONO_TABLE_TYPEDEF);
+	int rows = mono_table_info_get_rows(tab);
+	for(int i = 0; i < rows; i++) {
+		uint32_t cols[MONO_TYPEDEF_SIZE];
+		mono_metadata_decode_row(tab, i, cols, MONO_TYPEDEF_SIZE);
+		const char* ns = mono_metadata_string_heap(m_image, cols[MONO_TYPEDEF_NAMESPACE]);
+		const char* c = mono_metadata_string_heap(m_image, cols[MONO_TYPEDEF_NAME]);
+		printf("Class lookup %s.%s\n",ns,c);
+		m_ctx->FindClass(ns, c);
+	}
+}
+
+
+//================================================================//
+//
 // Managed Type
 //
 //================================================================//
@@ -211,11 +246,11 @@ ManagedScriptContext::ManagedScriptContext(const std::string& baseImage) :
 	m_baseImage(baseImage)
 {
 	m_domain = mono_jit_init(baseImage.c_str());
-	ManagedAssembly baseDesc;
-	baseDesc.m_assembly = mono_domain_assembly_open(m_domain, baseImage.c_str());
-	baseDesc.m_image = mono_assembly_get_image(baseDesc.m_assembly);
-	baseDesc.m_path = baseImage;
-	m_loadedAssemblies.push_back(baseDesc);
+	MonoAssembly* ass = mono_domain_assembly_open(m_domain, baseImage.c_str());
+	MonoImage* img = mono_assembly_get_image(ass);
+	ManagedAssembly* newass = new ManagedAssembly(this, baseImage, img, ass);
+	m_loadedAssemblies.push_back(newass);
+	newass->PopulateReflectionInfo();
 }
 
 ManagedScriptContext::~ManagedScriptContext()
@@ -234,11 +269,9 @@ bool ManagedScriptContext::LoadAssembly(const char* path)
 	if(!img) {
 		return false;
 	}
-	ManagedAssembly assemblyDesc;
-	assemblyDesc.m_assembly = ass;
-	assemblyDesc.m_image = img;
-	assemblyDesc.m_path = path;
-	m_loadedAssemblies.push_back(assemblyDesc);
+	ManagedAssembly* newass = new ManagedAssembly(this, path, img, ass);
+	m_loadedAssemblies.push_back(newass);
+	newass->PopulateReflectionInfo();
 	return true;
 }
 
@@ -246,12 +279,12 @@ bool ManagedScriptContext::UnloadAssembly(const std::string& name)
 {
 	for(auto it = m_loadedAssemblies.begin(); it != m_loadedAssemblies.end(); ++it)
 	{
-		if(it->m_path == name)
+		if((*it)->m_path == name)
 		{
-			if(it->m_image)
-				mono_image_close(it->m_image);
-			if(it->m_assembly)
-				mono_assembly_close(it->m_assembly);
+			if((*it)->m_image)
+				mono_image_close((*it)->m_image);
+			if((*it)->m_assembly)
+				mono_assembly_close((*it)->m_assembly);
 			m_loadedAssemblies.erase(it);
 			return true;
 		}
@@ -268,7 +301,7 @@ ManagedClass* ManagedScriptContext::FindClass(const std::string& ns, const std::
 	for(auto& a : m_loadedAssemblies)
 	{
 		ManagedClass* _cls = nullptr;
-		if((_cls = FindClass(&a, ns, cls)))
+		if((_cls = FindClass(a, ns, cls)))
 			return _cls;
 	}
 	return nullptr;
@@ -300,9 +333,9 @@ ManagedAssembly* ManagedScriptContext::FindAssembly(const std::string &path)
 {
 	for(auto& a : m_loadedAssemblies)
 	{
-		if(a.m_path == path)
+		if(a->m_path == path)
 		{
-			return &a;
+			return a;
 		}
 	}
 	return nullptr;
@@ -314,11 +347,18 @@ void ManagedScriptContext::ClearReflectionInfo()
 {
 	for(auto& a : m_loadedAssemblies)
 	{
-		for(auto& kvPair : a.m_classes)
+		for(auto& kvPair : a->m_classes)
 		{
 			delete kvPair.second;
 		}
-		a.m_classes.clear();
+		a->m_classes.clear();
+	}
+}
+
+void ManagedScriptContext::PopulateReflectionInfo()
+{
+	for(auto& a : m_loadedAssemblies) {
+		a->PopulateReflectionInfo();
 	}
 }
 
