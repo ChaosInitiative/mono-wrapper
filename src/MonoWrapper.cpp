@@ -42,9 +42,47 @@ void ManagedAssembly::PopulateReflectionInfo()
 		mono_metadata_decode_row(tab, i, cols, MONO_TYPEDEF_SIZE);
 		const char* ns = mono_metadata_string_heap(m_image, cols[MONO_TYPEDEF_NAMESPACE]);
 		const char* c = mono_metadata_string_heap(m_image, cols[MONO_TYPEDEF_NAME]);
-		printf("Class lookup %s.%s\n",ns,c);
 		m_ctx->FindClass(ns, c);
 	}
+}
+
+/* NOTE: No info is cached here because it should be called sparingly! */
+void ManagedAssembly::GetReferencedTypes(std::vector<std::string>& refList)
+{
+	assert(m_ctx);
+	assert(m_image);
+	assert(m_assembly);
+
+	const MonoTableInfo* tab = mono_image_get_table_info(m_image, MONO_TABLE_TYPEREF);
+	int rows = mono_table_info_get_rows(tab);
+	//refList.reserve(rows);
+	for(int i = 0; i < rows; i++) {
+		uint32_t cols[MONO_TYPEREF_SIZE];
+		mono_metadata_decode_row(tab, i, cols, MONO_TYPEREF_SIZE);
+		const char* ns = mono_metadata_string_heap(m_image, cols[MONO_TYPEREF_NAMESPACE]);
+		const char* n = mono_metadata_string_heap(m_image, cols[MONO_TYPEREF_NAME]);
+		char type[512];
+		snprintf(type, sizeof(type), "%s.%s", ns, n);
+		refList.push_back((const char*)type);
+	}
+}
+
+bool ManagedAssembly::ValidateAgainstWhitelist(const std::vector<std::string>& whiteList)
+{
+	std::vector<std::string> refTypes;
+	this->GetReferencedTypes(refTypes);
+
+	for(auto& type : refTypes) {
+		bool found = false;
+		for(auto& wType : whiteList) {
+			if(type == wType) {
+				found = true;
+			}
+		}
+		if(!found) 
+			return false;
+	}
+	return true;
 }
 
 
@@ -360,6 +398,16 @@ void ManagedScriptContext::PopulateReflectionInfo()
 	for(auto& a : m_loadedAssemblies) {
 		a->PopulateReflectionInfo();
 	}
+}
+
+
+bool ManagedScriptContext::ValidateAgainstWhitelist(const std::vector<std::string> whitelist)
+{
+	for(auto& a : m_loadedAssemblies) {
+		if(!a->ValidateAgainstWhitelist(whitelist))
+			return false;
+	}
+	return true;
 }
 
 

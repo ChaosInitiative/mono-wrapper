@@ -26,8 +26,13 @@ protected:
 	friend class ManagedScriptContext;
 	friend class ManagedClass;
 	friend class ManagedMethod;
-public:
+
 	void PopulateReflectionInfo();
+
+public:
+	void GetReferencedTypes(std::vector<std::string>& refList);
+
+	bool ValidateAgainstWhitelist(const std::vector<std::string>& whiteList);
 };
 
 class ManagedType
@@ -242,6 +247,8 @@ public:
 	/* Clears all reflection info stored in each assembly description */
 	/* WARNING: this will invalidate your handles! */
 	void ClearReflectionInfo();
+
+	bool ValidateAgainstWhitelist(const std::vector<std::string> whitelist);
 };
 
 class ManagedScriptSystem
