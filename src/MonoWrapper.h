@@ -8,6 +8,9 @@
 #include <list>
 
 template<class T>
+class ManagedBase;
+
+template<class T>
 class ManagedHandle
 {
 private:
@@ -18,6 +21,7 @@ protected:
 	void Invalidate() { m_valid = false; }
 	void Validate() { m_valid = true; }
 	friend T;
+	friend ManagedBase<T>;
 
 public:
 	ManagedHandle(T* obj) :
@@ -49,11 +53,18 @@ public:
 template<class T>
 class ManagedBase
 {
-public:
-	typedef ManagedHandle<T>* HandleT;
+protected:
 	friend ManagedHandle<T>;
+protected:
+	typedef ManagedHandle<T>* HandleT;
 
 	HandleT m_handle;
+
+	ManagedBase() :
+		m_handle(nullptr)
+	{
+
+	}
 
 	void AttachHandle(HandleT handle)
 	{
@@ -67,13 +78,25 @@ public:
 		m_handle = nullptr;
 	}
 
+	virtual void InvalidateHandle()
+	{
+		if(m_handle)
+			m_handle->Invalidate();
+	}
+
+	virtual void ValidateHandle()
+	{
+		if(m_handle)
+			m_handle->Validate();
+	}
+
 };
 
 //==============================================================================================//
 // ManagedAssembly
 //      Represents an Assembly object
 //==============================================================================================//
-class ManagedAssembly : protected ManagedBase<ManagedAssembly>
+class ManagedAssembly : public ManagedBase<ManagedAssembly>
 {
 private:
 	typedef ManagedHandle<ManagedAssembly>* HandleT;
@@ -108,6 +131,7 @@ public:
 	/* Invalidates all internal data and unloads the assembly */
 	/* Delete the object after this */
 	void Unload();
+	void InvalidateHandle() override;
 };
 
 
@@ -115,7 +139,7 @@ public:
 // ManagedType
 //      Represents a simple mono type
 //==============================================================================================//
-class ManagedType : protected ManagedBase<ManagedType>
+class ManagedType : public ManagedBase<ManagedType>
 {
 private:
 	MonoType* m_type;
@@ -153,11 +177,14 @@ public:
 // ManagedObject
 //      Wrapper around a mono object
 //==============================================================================================//
-class ManagedObject : protected ManagedBase<ManagedObject>
+class ManagedObject : public ManagedBase<ManagedObject>
 {
 private:
 	MonoObject* m_obj;
 	class ManagedClass* m_class;
+
+	friend class ManagedClass;
+	friend class ManagedMethod;
 
 public:
 	ManagedObject() = delete;
@@ -180,7 +207,7 @@ public:
 // ManagedMethod
 //      Represents a MonoMethod object, must be a part of a class
 //==============================================================================================//
-class ManagedMethod : protected ManagedBase<ManagedMethod>
+class ManagedMethod : public ManagedBase<ManagedMethod>
 {
 private:
 	MonoMethod* m_method;
@@ -214,6 +241,7 @@ protected:
 	friend class ManagedClass;
 	friend class ManagedObject;
 
+	void InvalidateHandle() override;
 
 public:
 	[[nodiscard]] ManagedAssembly* Assembly() const;
@@ -231,7 +259,7 @@ public:
 // ManagedField
 //      Represents a MonoField, or a field in a class
 //==============================================================================================//
-class ManagedField : protected ManagedBase<ManagedField>
+class ManagedField : public ManagedBase<ManagedField>
 {
 private:
 	MonoClassField* m_field;
@@ -255,7 +283,7 @@ protected:
 // ManagedProperty
 //      Represents a MonoProperty
 //==============================================================================================//
-class ManagedProperty : protected ManagedBase<ManagedProperty>
+class ManagedProperty : public ManagedBase<ManagedProperty>
 {
 private:
 	MonoProperty* m_property;
@@ -288,7 +316,7 @@ public:
 // ManagedClass
 //      Represents a MonoClass object and stores cached info about it
 //==============================================================================================//
-class ManagedClass : protected ManagedBase<ManagedClass>
+class ManagedClass : public ManagedBase<ManagedClass>
 {
 private:
 	std::vector<class ManagedMethod*> m_methods;
@@ -312,6 +340,8 @@ protected:
 	~ManagedClass();
 
 	void PopulateReflectionInfo();
+
+	void InvalidateHandle() override;
 
 public:
 	ManagedClass() = delete;

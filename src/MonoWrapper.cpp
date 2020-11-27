@@ -100,7 +100,16 @@ void ManagedAssembly::DisposeReflectionInfo()
 
 void ManagedAssembly::Unload()
 {
+	this->InvalidateHandle();
 	this->DisposeReflectionInfo();
+}
+
+void ManagedAssembly::InvalidateHandle()
+{
+	ManagedBase::InvalidateHandle();
+	for(auto& kv : m_classes) {
+		kv.second->InvalidateHandle();
+	}
 }
 
 //================================================================//
@@ -187,6 +196,22 @@ ManagedClass* ManagedMethod::Class() const
 {
 	return m_class;
 }
+
+void ManagedMethod::InvalidateHandle()
+{
+	ManagedBase::InvalidateHandle();
+	m_returnType->InvalidateHandle();
+	for (auto &parm : m_params)
+	{
+		parm->InvalidateHandle();
+	}
+	for (auto &a : m_attributes)
+	{
+		a->InvalidateHandle();
+	}
+}
+
+
 
 //================================================================//
 //
@@ -290,6 +315,19 @@ void ManagedClass::PopulateReflectionInfo()
 
 	m_populated = true;
 }
+void ManagedClass::InvalidateHandle()
+{
+	ManagedBase<ManagedClass>::InvalidateHandle();
+	for(auto& attr : m_attributes) {
+		attr->InvalidateHandle();
+	}
+	for(auto& meth : m_methods) {
+		meth->InvalidateHandle();
+	}
+
+}
+
+
 
 //================================================================//
 //
