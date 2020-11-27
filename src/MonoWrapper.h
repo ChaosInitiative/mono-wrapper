@@ -59,9 +59,11 @@ protected:
 	typedef ManagedHandle<T>* HandleT;
 
 	HandleT m_handle;
+	bool m_valid;
 
 	ManagedBase() :
-		m_handle(nullptr)
+		m_handle(nullptr),
+		m_valid(false)
 	{
 
 	}
@@ -70,6 +72,10 @@ protected:
 	{
 		handle->Validate();
 		m_handle = handle;
+		if(m_valid)
+			m_handle->Validate();
+		else
+			m_handle->Invalidate();
 	}
 
 	void DetachHandle(HandleT handle)
@@ -82,12 +88,14 @@ protected:
 	{
 		if(m_handle)
 			m_handle->Invalidate();
+		m_valid = false;
 	}
 
 	virtual void ValidateHandle()
 	{
 		if(m_handle)
 			m_handle->Validate();
+		m_valid = true;
 	}
 
 };

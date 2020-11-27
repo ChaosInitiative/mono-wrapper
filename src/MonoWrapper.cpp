@@ -290,8 +290,20 @@ ManagedClass::~ManagedClass()
 
 void ManagedClass::PopulateReflectionInfo()
 {
-	if (m_populated) return;
+	assert(!m_valid);
+	if(m_valid) return;
 	void *iter = nullptr;
+
+	/* If we are invalid and handles are dangling, it means we've undergone a reload */
+	if(m_attrInfo) {
+		mono_custom_attrs_free(m_attrInfo);
+		m_attrInfo = mono_custom_attrs_from_class(m_class);
+	}
+
+	/* Get all of the attributes */
+	if(mono_custom_attrs_has_attr(m_attrInfo, m_class)) {
+		m_attributes.push_back(new ManagedObject(mono_custom_attrs_get_attr(m_attrInfo, m_class), this));
+	}
 
 	MonoMethod *method;
 	while ((method = mono_class_get_methods(m_class, &iter)))
