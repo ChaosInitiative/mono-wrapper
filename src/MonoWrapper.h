@@ -506,6 +506,11 @@ public:
 	void RegisterNativeFunction(const char* name, void* func);
 
 	void ReportProfileStats();
+
+	uint32_t MaxGCGeneration();
+	void RunGCCollect(uint32_t gen);
+	void RunGCCollectAll();
+
 };
 
 struct ManagedProfilingSettings_t

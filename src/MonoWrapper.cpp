@@ -792,6 +792,23 @@ void ManagedScriptSystem::ReportProfileStats()
 	printf("Total Allocations: %lu\nBytes Allocated: %lu\nTotal Moves: %lu\nBytes Moved: %lu\n", prof->totalAllocs, prof->bytesAlloc, prof->totalMoves, prof->bytesMoved);
 }
 
+uint32_t ManagedScriptSystem::MaxGCGeneration()
+{
+	return mono_gc_max_generation();
+}
+
+void ManagedScriptSystem::RunGCCollect(uint32_t gen)
+{
+	mono_gc_collect(gen);
+}
+
+void ManagedScriptSystem::RunGCCollectAll()
+{
+	for(int i = 0; i < mono_gc_max_generation(); i++) {
+		mono_gc_collect(i);
+	}
+}
+
 //================================================================//
 //
 // Managed Compiler
