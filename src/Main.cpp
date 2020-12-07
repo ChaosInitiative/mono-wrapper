@@ -176,7 +176,7 @@ int main(int argc, char **argv)
 	};
 
 	rctx->BeginPoint("Method Lookup");
-	auto method = cls->FindMethod("Compile");
+	auto method = cls->FindMethod("Test");
 	rctx->EndPoint();
 
 	if(!method) {
@@ -184,15 +184,8 @@ int main(int argc, char **argv)
 	}
 
 	rctx->BeginPoint("Parameter matching");
-	bool ok = method->MatchSignature(sigMatch);
+	mono_runtime_invoke(method->RawMethod(), NULL, NULL, NULL);
 	rctx->EndPoint();
-
-	if(!ok) {
-		printf("Failed to match sig.\n");
-	}
-	else {
-		printf("Sig matched!\n");
-	}
 
 
 #endif
