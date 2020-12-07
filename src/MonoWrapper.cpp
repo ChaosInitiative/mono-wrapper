@@ -518,6 +518,7 @@ bool ManagedScriptContext::ValidateAgainstWhitelist(const std::vector<std::strin
 //================================================================//
 
 ManagedScriptSystem::ManagedScriptSystem(
+		const char* config,
 		void *(*_malloc)      (size_t size),
 		void *(*_realloc)     (void *mem, size_t count),
 		void (*_free)        (void *mem),
@@ -530,6 +531,8 @@ ManagedScriptSystem::ManagedScriptSystem(
 		abort();
 	}
 	g_managedScriptSystemExists = true;
+
+	mono_config_parse_memory(config);
 
 	/* Create and register the new profiler */
 	g_monoProfiler.handle = mono_profiler_create(&g_monoProfiler);
@@ -669,7 +672,7 @@ bool ManagedCompiler::Compile(const std::string &buildDir, const std::string &ou
 		&langVer
 	};
 	MonoObject* exception = nullptr;
-	MonoObject* ret = mono_runtime_invoke(m_compileMethod->RawMethod(), nullptr, params, &exception);
+	MonoObject* ret = mono_runtime_invoke(m_compileMethod->RawMethod(), nullptr, params, nullptr);
 
 	if(exception) {
 		printf("Invocation of ScriptCompiler::Compiler::Compile failed due to exception\n");

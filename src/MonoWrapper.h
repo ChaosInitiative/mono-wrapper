@@ -433,6 +433,7 @@ private:
 	MonoAllocatorVTable m_allocator;
 public:
 	explicit ManagedScriptSystem(
+			const char* config, // NULL terminated string with config data in it
 			void *(*_malloc)      (size_t size) = nullptr,
 			void *(*_realloc)     (void *mem, size_t count) = nullptr,
 			void (*_free)        (void *mem) = nullptr,

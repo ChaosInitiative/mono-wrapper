@@ -7,7 +7,7 @@
 #include <mono/metadata/class.h>
 #include <mono/metadata/reflection.h>
 #include <mono/metadata/mono-debug.h>
-
+#include <signal.h>
 #include "MonoWrapper.h"
 #include "Metrics.hpp"
 
@@ -21,6 +21,9 @@
 #include <unistd.h>
 
 std::string gLibraryName;
+std::string gConfigName;
+
+ManagedScriptSystem* g_scriptSystem;
 
 int main(int argc, char **argv)
 {
@@ -29,14 +32,25 @@ int main(int argc, char **argv)
 		printf("Please pass a library name to load!\n");
 		exit(1);
 	}
-	gLibraryName = argv[1];
+	gConfigName = argv[1];
+	gLibraryName = argv[2];
 
-	static ManagedScriptSystem scriptSystem;
+	FILE* fp = fopen(gConfigName.c_str(), "r");
+	if(!fp) {
+		printf("Failed to open config file: %s\n", gConfigName.c_str());
+		abort();
+	}
+	static char data[16384];
+	fread(data, sizeof(data), 1, fp);
+	fclose(fp);
 
 	ResourceContext *rctx = new ResourceContext();
 
+	g_scriptSystem = new ManagedScriptSystem(data, malloc);
+
+#if 0
 	rctx->BeginPoint("Initial Create Context");
-	ManagedScriptContext *ctx = scriptSystem.CreateContext(gLibraryName.c_str());
+	ManagedScriptContext *ctx = g_scriptSystem->CreateContext(gLibraryName.c_str());
 	rctx->EndPoint();
 
 	rctx->BeginPoint("Initial Find Class");
@@ -150,8 +164,27 @@ int main(int argc, char **argv)
 	else {
 		printf("WHITELIST VALIDATION FAILED\n");
 	}
+#endif
 
-	ManagedCompiler* compiler = scriptSystem.CreateCompiler("src/ScriptCompiler/bin/Debug/ScriptCompiler.dll");
-	compiler->Compile("src/Scripts/TestScript/src/", "Test.dll", 7);
+	printf("Create compiler\n");
+	ManagedCompiler* compiler = g_scriptSystem->CreateCompiler("src/ScriptCompiler/bin/Debug/ScriptCompiler.dll");
+	printf("Try compile\n");
+	auto used = g_scriptSystem->UsedHeapSize();
+	auto heap = g_scriptSystem->HeapSize();
+	printf("mem: %lu/%lu (%f%%)\n", used, heap, (float)heap/(float)used);
+
+	if(!compiler->Compile("src/Scripts/TestScript/src/", "Test.dll", 7)) {
+		printf("Compile failed.\n");
+		//assert(0);
+	}
+
+	used = g_scriptSystem->UsedHeapSize();
+	heap = g_scriptSystem->HeapSize();
+	printf("mem: %lu/%lu (%f%%)\n", used, heap, (float)heap/(float)used);
+
+
 	rctx->Report();
+
+	g_scriptSystem->ReportProfileStats();
 }
+
