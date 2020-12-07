@@ -471,8 +471,13 @@ ManagedObject* ManagedClass::CreateInstance(std::vector<MonoType*> signature, vo
 	for(auto& method : m_methods) {
 		if(method->m_name == ".ctor" && method->MatchSignature(signature)) {
 			MonoObject* exception = nullptr;
-			MonoObject* obj = mono_runtime_invoke(method->m_method, NULL, params, &exception);
+			MonoObject* obj = mono_object_new(m_assembly->m_ctx->m_domain, m_class); // Allocate storage
+			mono_runtime_object_init(obj); // Invoke default constructor
+			if(signature.size() > 0) {
+				mono_runtime_invoke(method->m_method, obj, params, &exception);
+			}
 			if(exception || !obj) {
+				m_assembly->m_ctx->ReportException(obj, m_assembly);
 				return nullptr;
 			}
 			return new ManagedObject(obj, this);

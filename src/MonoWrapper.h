@@ -428,6 +428,7 @@ public:
 	ManagedScriptContext(ManagedScriptContext&&) = delete;
 
 	friend class ManagedCompiler;
+	friend class ManagedClass;
 
 	using ExceptionCallbackT = std::function<void(ManagedScriptContext*, ManagedAssembly*, MonoObject*, ManagedException_t)>;
 protected:
