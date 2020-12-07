@@ -732,9 +732,17 @@ void ManagedScriptContext::ReportException(MonoObject *obj, ManagedAssembly* ass
 	o->GetProperty(std::string("Source"), reinterpret_cast<void **>(&src));
 	o->GetProperty(std::string("StackTrace"), reinterpret_cast<void**>(&stack));
 
-	exc.stackTrace = mono_string_to_utf8(stack);
-	exc.source = mono_string_to_utf8(src);
-	exc.message = mono_string_to_utf8(msg);
+	char* stackTraceStr = mono_string_to_utf8(stack);
+	char* sourceStr = mono_string_to_utf8(src);
+	char* messageStr = mono_string_to_utf8(msg);
+
+	exc.stackTrace = (const char*)stackTraceStr;
+	exc.source = (const char*)sourceStr;
+	exc.message = (const char*)messageStr;
+
+	mono_free(stackTraceStr);
+	mono_free(sourceStr);
+	mono_free(messageStr);
 
 	for(auto& c : m_callbacks) {
 		c(this, ass, obj, exc);
