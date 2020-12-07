@@ -11,6 +11,8 @@
 #include <mono/metadata/mono-gc.h>
 #include <mono/metadata/threads.h>
 #include <mono/metadata/debug-helpers.h>
+#include <mono/metadata/mono-gc.h>
+#include <mono/metadata/loader.h>
 
 #include "MonoWrapper.h"
 
@@ -349,8 +351,9 @@ ManagedScriptContext::ManagedScriptContext(const std::string& baseImage) :
 	m_baseImage(baseImage)
 {
 	//m_domain = mono_jit_init(baseImage.c_str());
-	m_domain = mono_domain_create_appdomain(strdup(baseImage.c_str()), "mono-config");
+	m_domain = mono_domain_create_appdomain(strdup(baseImage.c_str()), strdup("mono-config"));
 	//m_domain = mono_domain_create();
+
 	MonoAssembly* ass = mono_domain_assembly_open(m_domain, baseImage.c_str());
 	MonoImage* img = mono_assembly_get_image(ass);
 	ManagedAssembly* newass = new ManagedAssembly(this, baseImage, img, ass);
@@ -491,10 +494,36 @@ bool ManagedScriptContext::ValidateAgainstWhitelist(const std::vector<std::strin
 //
 //================================================================//
 
-ManagedScriptSystem::ManagedScriptSystem()
+ManagedScriptSystem::ManagedScriptSystem(
+		void *(*_malloc)      (size_t size),
+		void *(*_realloc)     (void *mem, size_t count),
+		void (*_free)        (void *mem),
+		void *(*_calloc)      (size_t count, size_t size))
 {
+	/* Basically just a guard to ensure we dont have multiple per process */
+	static bool g_managedScriptSystemExists = false;
+	if(g_managedScriptSystemExists) {
+		printf("A managed script system already exists!\n\tThere can only be one per process because of how mono works.\n\tPlease fix your program so only one script system is made\n\n");
+		abort();
+	}
+	g_managedScriptSystemExists = true;
+
+	/* Register our memory allocator for mono */
+	if(!_malloc) _malloc = malloc;
+	if(!_realloc) _realloc = realloc;
+	if(!_free) _free = free;
+	if(!_calloc) _calloc = calloc;
+	m_allocator = {
+		MONO_ALLOCATOR_VTABLE_VERSION,
+		_malloc,
+		_realloc,
+		_free,
+		_calloc
+	};
+	mono_set_allocator_vtable(&m_allocator);
+
 	// Create a SINGLE jit environment!
-	static MonoDomain* g_jitDomain = mono_jit_init("abcd");
+	g_jitDomain = mono_jit_init("abcd");
 	if(!g_jitDomain) {
 		printf("Failure while creating mono jit!\n");
 		assert(0);
@@ -505,10 +534,11 @@ ManagedScriptSystem::ManagedScriptSystem()
 ManagedScriptSystem::~ManagedScriptSystem()
 {
 	// contexts should be freed before shutdown
-	assert(m_contexts.size() == 0);
+	//assert(m_contexts.size() == 0);
 	for(auto c : m_contexts) { 
 		delete (c);
 	}
+	mono_jit_cleanup(g_jitDomain);
 }
 
 ManagedScriptContext* ManagedScriptSystem::CreateContext(const char* image)
@@ -555,6 +585,11 @@ void ManagedScriptSystem::DestroyCompiler(ManagedCompiler *c)
 	DestroyContext(c->m_ctx);
 }
 
+void ManagedScriptSystem::RegisterNativeFunction(const char *name, void *func)
+{
+	mono_add_internal_call(name, func);
+}
+
 //================================================================//
 //
 // Managed Compiler
@@ -580,15 +615,28 @@ void ManagedCompiler::Setup()
 
 bool ManagedCompiler::Compile(const std::string &buildDir, const std::string &outFile, int langVer)
 {
-	MonoString* outFileString = mono_string_new(m_ctx->m_domain, outFile.c_str());
-	MonoString* buildDirString = mono_string_new(m_ctx->m_domain, buildDir.c_str());
+	MonoString* outFileString = mono_string_new_len(m_ctx->m_domain, outFile.c_str(), outFile.length());
+	MonoString* buildDirString = mono_string_new_len(m_ctx->m_domain, buildDir.c_str(), buildDir.length());
+
+	assert(outFileString);
+	assert(buildDirString);
 
 	void* params[] = {
 		&outFileString,
 		&buildDirString,
 		&langVer
 	};
+	MonoObject* exception = nullptr;
 	MonoObject* ret = mono_runtime_invoke(m_compileMethod->RawMethod(), nullptr, params, nullptr);
 
-	return ret;
+	if(exception) {
+		printf("Invocation of ScriptCompiler::Compiler::Compile failed due to exception\n");
+
+	} else {
+		mono_free(outFileString);
+		mono_free(buildDirString);
+	}
+
+
+	return ret != nullptr;
 }

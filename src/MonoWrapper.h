@@ -426,13 +426,25 @@ public:
 // ManagedScriptSystem
 //      Handles execution of a "script"
 //==============================================================================================//
+static MonoDomain* g_jitDomain;
 class ManagedScriptSystem
 {
 private:
 	std::vector<ManagedScriptContext*> m_contexts;
+	MonoAllocatorVTable m_allocator;
 public:
-	ManagedScriptSystem();
+	explicit ManagedScriptSystem(
+			void *(*_malloc)      (size_t size) = nullptr,
+			void *(*_realloc)     (void *mem, size_t count) = nullptr,
+			void (*_free)        (void *mem) = nullptr,
+			void *(*_calloc)      (size_t count, size_t size) = nullptr
+		);
 	~ManagedScriptSystem();
+
+	/* NO COPIES! */
+	ManagedScriptSystem(ManagedScriptSystem&) = delete;
+	ManagedScriptSystem(ManagedScriptSystem&&) = delete;
+	ManagedScriptSystem() = delete;
 
 	ManagedScriptContext* CreateContext(const char* image);
 
@@ -446,6 +458,8 @@ public:
 
 	class ManagedCompiler* CreateCompiler(const std::string& pathToCompilerBinary);
 	void DestroyCompiler(ManagedCompiler* c);
+
+	void RegisterNativeFunction(const char* name, void* func);
 };
 
 
