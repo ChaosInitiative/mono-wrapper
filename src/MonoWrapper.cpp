@@ -13,11 +13,34 @@
 #include <mono/metadata/debug-helpers.h>
 #include <mono/metadata/mono-gc.h>
 #include <mono/metadata/loader.h>
+#include <mono/metadata/profiler.h>
 
 #include "MonoWrapper.h"
 
 #include <assert.h>
 #include <string.h>
+
+MonoDomain* g_jitDomain;
+
+struct _MonoProfiler {
+	MonoProfilerHandle handle;
+	uint64_t totalAllocs;
+	uint64_t totalMoves;
+	uint64_t bytesMoved;
+	uint64_t bytesAlloc;
+};
+
+MonoProfiler g_monoProfiler;
+
+/* Profiler methods */
+static void Profiler_RuntimeInit(MonoProfiler* prof);
+static void Profiler_RuntimeShutdownStart(MonoProfiler* prof);
+static void Profiler_RuntimeShutdownEnd(MonoProfiler* prof);
+static void Profiler_ContextLoaded(MonoProfiler* prof, MonoAppContext* ctx);
+static void Profiler_ContextUnloaded(MonoProfiler* prof, MonoAppContext* ctx);
+static void Profiler_GCEvent(MonoProfiler* prof, MonoProfilerGCEvent ev, uint32_t gen, mono_bool isSerial);
+static void Profiler_GCAlloc(MonoProfiler* prof, MonoObject* obj);
+static void Profiler_GCResize(MonoProfiler* prof, uintptr_t size);
 
 
 //================================================================//
@@ -508,6 +531,17 @@ ManagedScriptSystem::ManagedScriptSystem(
 	}
 	g_managedScriptSystemExists = true;
 
+	/* Create and register the new profiler */
+	g_monoProfiler.handle = mono_profiler_create(&g_monoProfiler);
+	mono_profiler_set_runtime_initialized_callback(g_monoProfiler.handle, Profiler_RuntimeInit);
+	mono_profiler_set_runtime_shutdown_begin_callback(g_monoProfiler.handle, Profiler_RuntimeShutdownStart);
+	mono_profiler_set_runtime_shutdown_end_callback(g_monoProfiler.handle, Profiler_RuntimeShutdownEnd);
+	mono_profiler_set_gc_allocation_callback(g_monoProfiler.handle, Profiler_GCAlloc);
+	mono_profiler_set_gc_event_callback(g_monoProfiler.handle, Profiler_GCEvent);
+	mono_profiler_set_gc_resize_callback(g_monoProfiler.handle, Profiler_GCResize);
+	mono_profiler_set_context_loaded_callback(g_monoProfiler.handle, Profiler_ContextLoaded);
+	mono_profiler_set_context_unloaded_callback(g_monoProfiler.handle, Profiler_ContextUnloaded);
+
 	/* Register our memory allocator for mono */
 	if(!_malloc) _malloc = malloc;
 	if(!_realloc) _realloc = realloc;
@@ -529,6 +563,7 @@ ManagedScriptSystem::ManagedScriptSystem(
 		assert(0);
 		abort();
 	}
+
 }
 
 ManagedScriptSystem::~ManagedScriptSystem()
@@ -590,6 +625,13 @@ void ManagedScriptSystem::RegisterNativeFunction(const char *name, void *func)
 	mono_add_internal_call(name, func);
 }
 
+void ManagedScriptSystem::ReportProfileStats()
+{
+	MonoProfiler* prof = &g_monoProfiler;
+	printf("---- MONO PROFILE REPORT ----\n");
+	printf("Total Allocations: %lu\nBytes Allocated: %lu\nTotal Moves: %lu\nBytes Moved: %lu\n", prof->totalAllocs, prof->bytesAlloc, prof->totalMoves, prof->bytesMoved);
+}
+
 //================================================================//
 //
 // Managed Compiler
@@ -627,7 +669,7 @@ bool ManagedCompiler::Compile(const std::string &buildDir, const std::string &ou
 		&langVer
 	};
 	MonoObject* exception = nullptr;
-	MonoObject* ret = mono_runtime_invoke(m_compileMethod->RawMethod(), nullptr, params, nullptr);
+	MonoObject* ret = mono_runtime_invoke(m_compileMethod->RawMethod(), nullptr, params, &exception);
 
 	if(exception) {
 		printf("Invocation of ScriptCompiler::Compiler::Compile failed due to exception\n");
@@ -640,3 +682,49 @@ bool ManagedCompiler::Compile(const std::string &buildDir, const std::string &ou
 
 	return ret != nullptr;
 }
+
+static void Profiler_RuntimeInit(MonoProfiler* prof)
+{
+	prof->bytesMoved = 0;
+	prof->totalAllocs = 0;
+	prof->totalMoves = 0;
+}
+
+static void Profiler_RuntimeShutdownStart(MonoProfiler* prof)
+{
+
+}
+
+static void Profiler_RuntimeShutdownEnd(MonoProfiler* prof)
+{
+
+}
+
+static void Profiler_ContextLoaded(MonoProfiler* prof, MonoAppContext* ctx)
+{
+
+}
+
+static void Profiler_ContextUnloaded(MonoProfiler* prof, MonoAppContext* ctx)
+{
+
+}
+
+static void Profiler_GCEvent(MonoProfiler* prof, MonoProfilerGCEvent ev, uint32_t gen, mono_bool isSerial)
+{
+
+}
+
+static void Profiler_GCAlloc(MonoProfiler* prof, MonoObject* obj)
+{
+	prof->bytesAlloc += mono_object_get_size(obj);
+	prof->totalAllocs++;
+}
+
+static void Profiler_GCResize(MonoProfiler* prof, uintptr_t size)
+{
+	prof->totalMoves++;
+	prof->bytesMoved += size;
+}
+
+

@@ -426,7 +426,6 @@ public:
 // ManagedScriptSystem
 //      Handles execution of a "script"
 //==============================================================================================//
-static MonoDomain* g_jitDomain;
 class ManagedScriptSystem
 {
 private:
@@ -460,6 +459,8 @@ public:
 	void DestroyCompiler(ManagedCompiler* c);
 
 	void RegisterNativeFunction(const char* name, void* func);
+
+	void ReportProfileStats();
 };
 
 
