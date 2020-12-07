@@ -6,6 +6,7 @@
 #include <map>
 #include <unordered_map>
 #include <list>
+#include <functional>
 
 template<class T>
 class ManagedBase;
@@ -428,7 +429,10 @@ public:
 
 	friend class ManagedCompiler;
 
+	using ExceptionCallbackT = std::function<void(ManagedScriptContext*, ManagedAssembly*, MonoObject*, ManagedException_t)>;
 protected:
+	std::vector<ExceptionCallbackT> m_callbacks;
+
 	friend class ManagedScriptSystem;
 
 	explicit ManagedScriptContext(const std::string& baseImage);
@@ -456,6 +460,10 @@ public:
 	bool ValidateAgainstWhitelist(const std::vector<std::string> &whitelist);
 
 	void ReportException(MonoObject* obj, ManagedAssembly* ass);
+
+	void RegisterExceptionCallback(ExceptionCallbackT callback) {
+		m_callbacks.push_back(callback);
+	}
 };
 
 //==============================================================================================//

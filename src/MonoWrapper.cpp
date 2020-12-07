@@ -735,6 +735,10 @@ void ManagedScriptContext::ReportException(MonoObject *obj, ManagedAssembly* ass
 	exc.stackTrace = mono_string_to_utf8(stack);
 	exc.source = mono_string_to_utf8(src);
 	exc.message = mono_string_to_utf8(msg);
+
+	for(auto& c : m_callbacks) {
+		c(this, ass, obj, exc);
+	}
 }
 
 
