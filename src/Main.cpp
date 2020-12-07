@@ -57,17 +57,17 @@ int main(int argc, char **argv)
 
 	g_scriptSystem = new ManagedScriptSystem(settings);
 
-#if 0
+#if 1
 	rctx->BeginPoint("Initial Create Context");
 	ManagedScriptContext *ctx = g_scriptSystem->CreateContext(gLibraryName.c_str());
 	rctx->EndPoint();
 
 	rctx->BeginPoint("Initial Find Class");
-	ManagedClass *cls = ctx->FindClass("ScriptSystem", "Script");
+	ManagedClass *cls = ctx->FindClass("ScriptCompiler", "Compiler");
 	rctx->EndPoint();
 
 	rctx->BeginPoint("Second Find Class");
-	cls = ctx->FindClass("ScriptSystem", "Script");
+	cls = ctx->FindClass("ScriptCompiler", "Compiler");
 	rctx->EndPoint();
 
 	if (!cls)
@@ -166,15 +166,38 @@ int main(int argc, char **argv)
 	rctx->BeginPoint("Validation Test");
 	bool valid = a->ValidateAgainstWhitelist(whitelist);
 	rctx->EndPoint();
-	
-	if(valid) {
-		printf("WHITELIST VALIDATION OK\n");
+
+	auto stok = mono_class_get_type_token(mono_get_string_class());
+	auto itok = mono_class_get_type_token(mono_get_int32_class());
+	std::vector<MonoType*> sigMatch = {
+		mono_class_get_type(mono_get_string_class()),
+		mono_class_get_type(mono_get_string_class()),
+		mono_class_get_type(mono_get_int32_class())
+	};
+
+	rctx->BeginPoint("Method Lookup");
+	auto method = cls->FindMethod("Compile");
+	rctx->EndPoint();
+
+	if(!method) {
+		printf("Method not found!\n");
+	}
+
+	rctx->BeginPoint("Parameter matching");
+	bool ok = method->MatchSignature(sigMatch);
+	rctx->EndPoint();
+
+	if(!ok) {
+		printf("Failed to match sig.\n");
 	}
 	else {
-		printf("WHITELIST VALIDATION FAILED\n");
+		printf("Sig matched!\n");
 	}
+
+
 #endif
 
+#if 0
 	printf("Create compiler\n");
 	ManagedCompiler* compiler = g_scriptSystem->CreateCompiler("src/ScriptCompiler/bin/Debug/ScriptCompiler.dll");
 	printf("Try compile\n");
@@ -190,7 +213,7 @@ int main(int argc, char **argv)
 	used = g_scriptSystem->UsedHeapSize();
 	heap = g_scriptSystem->HeapSize();
 	printf("mem: %lu/%lu (%f%%)\n", used, heap, (float)heap/(float)used);
-
+#endif
 
 	rctx->Report();
 

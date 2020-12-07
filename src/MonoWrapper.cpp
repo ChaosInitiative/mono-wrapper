@@ -236,6 +236,65 @@ void ManagedMethod::InvalidateHandle()
 	}
 }
 
+bool ManagedMethod::MatchSignature(MonoType* returnval, std::vector<MonoType*> params)
+{
+	/* Pre-verification that the params are likely to be equal */
+	if(mono_signature_get_param_count(m_signature) != params.size()) {
+		return false;
+	}
+
+	MonoType* type = mono_signature_get_return_type(m_signature);
+	if(!mono_metadata_type_equal(type, returnval))
+		return false;
+
+	void* iter = nullptr;
+	type = nullptr;
+	int i = 0;
+	while((type = mono_signature_get_params(m_signature, &iter))) {
+		if(!mono_metadata_type_equal(type, params[i]))
+			return false;
+		i++;
+	}
+
+	return true;
+}
+
+bool ManagedMethod::MatchSignature(std::vector<MonoType*> params)
+{
+	if(mono_signature_get_param_count(m_signature) != params.size()) {
+		return false;
+	}
+
+	// Verify that return type is VOID
+	// quite messy indeed
+	MonoType* type = mono_signature_get_return_type(m_signature);
+	if(!mono_metadata_type_equal(type, mono_class_get_type(mono_get_void_class()))) {
+		return false;
+	}
+
+	void* iter = nullptr;
+	type = nullptr;
+	int i = 0;
+	while((type = mono_signature_get_params(m_signature, &iter))) {
+		if(!mono_metadata_type_equal(type, params[i])) {
+			return false;
+		}
+		i++;
+	}
+	return true;
+}
+
+bool ManagedMethod::MatchSignature()
+{
+	MonoType* type = mono_signature_get_return_type(m_signature);
+	if(!mono_metadata_type_equal(type, mono_class_get_type(mono_get_void_class()))) {
+		return false;
+	}
+
+	// Check param count is 0
+	return mono_signature_get_param_count(m_signature) == 0;
+}
+
 
 
 //================================================================//
@@ -289,7 +348,8 @@ ManagedClass::ManagedClass(ManagedAssembly *assembly, const std::string &ns, con
 	m_assembly(assembly),
 	m_className(cls),
 	m_namespaceName(ns),
-	m_populated(false)
+	m_populated(false),
+	m_numConstructors(0)
 {
 	m_class = mono_class_from_name(m_assembly->m_image, ns.c_str(), cls.c_str());
 	if (!m_class)
@@ -314,7 +374,8 @@ ManagedClass::ManagedClass(ManagedAssembly *assembly, MonoClass *_cls, const std
 	m_class(_cls),
 	m_namespaceName(ns),
 	m_populated(false),
-	m_assembly(assembly)
+	m_assembly(assembly),
+	m_numConstructors(0)
 {
 	m_attrInfo = mono_custom_attrs_from_class(m_class);
 
@@ -345,6 +406,8 @@ void ManagedClass::PopulateReflectionInfo()
 	MonoMethod *method;
 	while ((method = mono_class_get_methods(m_class, &iter)))
 	{
+		if(strcmp(mono_method_get_name(method), ".ctor") == 0)
+			m_numConstructors++;
 		m_methods.push_back(new ManagedMethod(method, this));
 	}
 
@@ -400,6 +463,17 @@ ManagedProperty *ManagedClass::FindProperty(const std::string &prop)
 			return p;
 	}
 	return nullptr;
+}
+
+ManagedObject *ManagedClass::CreateInstance(void **parameters)
+{
+	MonoMethodSignature* s;
+
+}
+
+mono_byte ManagedClass::NumConstructors() const
+{
+	return m_numConstructors;
 }
 
 //================================================================//

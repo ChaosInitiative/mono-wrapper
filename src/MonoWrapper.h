@@ -97,7 +97,6 @@ protected:
 			m_handle->Validate();
 		m_valid = true;
 	}
-
 };
 
 //==============================================================================================//
@@ -268,6 +267,10 @@ public:
 	[[nodiscard]] int ParamCount() const { return m_paramCount; };
 
 	MonoMethod* RawMethod() { return m_method; };
+
+	bool MatchSignature(MonoType* returnval, std::vector<MonoType*> params);
+	bool MatchSignature(std::vector<MonoType*> params);
+	bool MatchSignature();
 };
 
 //==============================================================================================//
@@ -347,6 +350,7 @@ private:
 	MonoClass* m_class;
 	bool m_populated;
 	ManagedAssembly* m_assembly;
+	mono_byte m_numConstructors;
 
 	friend class ManagedScriptContext;
 	friend class ManagedMethod;
@@ -378,11 +382,13 @@ public:
 
 	[[nodiscard]] const std::vector<class ManagedProperty*> Properties() const { return m_properties; };
 
+	mono_byte NumConstructors() const;
+
 	ManagedMethod* FindMethod(const std::string& name);
-
 	ManagedField* FindField(const std::string& name);
-
 	ManagedProperty* FindProperty(const std::string& prop);
+
+	ManagedObject* CreateInstance(void** parameters);
 
 };
 
