@@ -46,7 +46,12 @@ int main(int argc, char **argv)
 
 	ResourceContext *rctx = new ResourceContext();
 
-	g_scriptSystem = new ManagedScriptSystem(data, malloc);
+	ManagedScriptSystemSettings_t settings;
+	settings.configIsFile = false;
+	settings.configData = data;
+	settings.scriptSystemDomainName = "ChaosScriptPOC";
+
+	g_scriptSystem = new ManagedScriptSystem(settings);
 
 #if 0
 	rctx->BeginPoint("Initial Create Context");

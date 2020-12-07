@@ -426,18 +426,44 @@ public:
 // ManagedScriptSystem
 //      Handles execution of a "script"
 //==============================================================================================//
+struct ManagedScriptSystemSettings_t
+{
+	/* Readable name of the domain to be created */
+	const char* scriptSystemDomainName;
+
+	/* if true, configData is a file path that will be parsed by mono */
+	bool configIsFile;
+	/* If configIsFile is true, this is a file path to the config. Otherwise, this is raw text data from the cfg file */
+	const char* configData;
+
+	/* Overrides for the default mono allocators */
+	void *(*_malloc)        (size_t size);
+	void *(*_realloc)       (void *mem, size_t count);
+	void (*_free)           (void *mem);
+	void *(*_calloc)        (size_t count, size_t size);
+
+	ManagedScriptSystemSettings_t()
+	{
+		_malloc = nullptr;
+		_realloc = nullptr;
+		_free = nullptr;
+		_calloc = nullptr;
+		configIsFile = true;
+		configData = "";
+		scriptSystemDomainName = "";
+	}
+
+};
+
 class ManagedScriptSystem
 {
 private:
 	std::vector<ManagedScriptContext*> m_contexts;
 	MonoAllocatorVTable m_allocator;
+	ManagedScriptSystemSettings_t m_settings;
 public:
 	explicit ManagedScriptSystem(
-			const char* config, // NULL terminated string with config data in it
-			void *(*_malloc)      (size_t size) = nullptr,
-			void *(*_realloc)     (void *mem, size_t count) = nullptr,
-			void (*_free)        (void *mem) = nullptr,
-			void *(*_calloc)      (size_t count, size_t size) = nullptr
+			ManagedScriptSystemSettings_t settings
 		);
 	~ManagedScriptSystem();
 
@@ -464,6 +490,22 @@ public:
 	void ReportProfileStats();
 };
 
+struct ManagedProfilingSettings_t
+{
+	/* Profiling enable */
+	bool enableProfiling : 1;
+	/* Things to profile */
+	bool profileCalls : 1;
+	bool profileAllocations : 1;
+	bool profileDomain : 1;
+	bool profileContext : 1;
+	bool profileAssembly : 1;
+	bool profileImage : 1;
+	bool profileExceptions : 1;
+	bool profileGC : 1;
+	bool profileThread : 1; /* Profile threading events */
+	bool recordThreadEvents : 1; /* Log thread start/stop events in a timestamped log */
+};
 
 //==============================================================================================//
 // ManagedCompiler

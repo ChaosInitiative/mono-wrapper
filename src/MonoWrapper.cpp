@@ -517,12 +517,8 @@ bool ManagedScriptContext::ValidateAgainstWhitelist(const std::vector<std::strin
 //
 //================================================================//
 
-ManagedScriptSystem::ManagedScriptSystem(
-		const char* config,
-		void *(*_malloc)      (size_t size),
-		void *(*_realloc)     (void *mem, size_t count),
-		void (*_free)        (void *mem),
-		void *(*_calloc)      (size_t count, size_t size))
+ManagedScriptSystem::ManagedScriptSystem(ManagedScriptSystemSettings_t settings) :
+	m_settings(settings)
 {
 	/* Basically just a guard to ensure we dont have multiple per process */
 	static bool g_managedScriptSystemExists = false;
@@ -532,7 +528,10 @@ ManagedScriptSystem::ManagedScriptSystem(
 	}
 	g_managedScriptSystemExists = true;
 
-	mono_config_parse_memory(config);
+	if(settings.configIsFile)
+		mono_config_parse(settings.configData);
+	else
+		mono_config_parse_memory(settings.configData);
 
 	/* Create and register the new profiler */
 	g_monoProfiler.handle = mono_profiler_create(&g_monoProfiler);
@@ -546,16 +545,16 @@ ManagedScriptSystem::ManagedScriptSystem(
 	mono_profiler_set_context_unloaded_callback(g_monoProfiler.handle, Profiler_ContextUnloaded);
 
 	/* Register our memory allocator for mono */
-	if(!_malloc) _malloc = malloc;
-	if(!_realloc) _realloc = realloc;
-	if(!_free) _free = free;
-	if(!_calloc) _calloc = calloc;
+	if(!settings._malloc) settings._malloc = malloc;
+	if(!settings._realloc) settings._realloc = realloc;
+	if(!settings._free) settings._free = free;
+	if(!settings._calloc) settings._calloc = calloc;
 	m_allocator = {
 		MONO_ALLOCATOR_VTABLE_VERSION,
-		_malloc,
-		_realloc,
-		_free,
-		_calloc
+		settings._malloc,
+		settings._realloc,
+		settings._free,
+		settings._calloc
 	};
 	mono_set_allocator_vtable(&m_allocator);
 
