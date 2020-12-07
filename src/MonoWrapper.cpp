@@ -465,10 +465,21 @@ ManagedProperty *ManagedClass::FindProperty(const std::string &prop)
 	return nullptr;
 }
 
-ManagedObject *ManagedClass::CreateInstance(void **parameters)
+/* Creates an instance of a this class */ 
+ManagedObject* ManagedClass::CreateInstance(std::vector<MonoType*> signature, void** params)
 {
-	MonoMethodSignature* s;
+	for(auto& method : m_methods) {
+		if(method->m_name == ".ctor" && method->MatchSignature(signature)) {
+			MonoObject* exception = nullptr;
+			MonoObject* obj = mono_runtime_invoke(method->m_method, NULL, params, &exception);
+			if(exception || !obj) {
+				return nullptr;
+			}
+			return new ManagedObject(obj, this);
+		}
+	}
 
+	return nullptr;
 }
 
 mono_byte ManagedClass::NumConstructors() const
@@ -518,6 +529,46 @@ bool ManagedObject::GetField(struct ManagedField *prop, void *outValue)
 {
 	mono_field_get_value(m_obj, prop->RawField(), outValue);
 	return true;
+}
+
+bool ManagedObject::SetProperty(const std::string &p, void *value)
+{
+	for(auto prop : m_class->m_properties) {
+		if(p == prop->m_name) {
+			return this->SetProperty(prop, value);
+		}
+	}
+	return false;
+}
+
+bool ManagedObject::SetField(const std::string &p, void *value)
+{
+	for(auto& f : m_class->m_fields) {
+		if(f->m_name == p) {
+			return this->SetField(f, value);
+		}
+	}
+	return false;
+}
+
+bool ManagedObject::GetProperty(const std::string &p, void **outValue)
+{
+	for(auto& prop : m_class->m_properties) {
+		if(prop->m_name == p) {
+			return this->GetProperty(prop, outValue);
+		}
+	}
+	return false;
+}
+
+bool ManagedObject::GetField(const std::string &p, void *outValue)
+{
+	for(auto& f : m_class->m_fields) {
+		if(f->m_name == p) {
+			return this->GetField(f, outValue);
+		}
+	}
+	return false;
 }
 
 
@@ -666,6 +717,24 @@ bool ManagedScriptContext::ValidateAgainstWhitelist(const std::vector<std::strin
 			return false;
 	}
 	return true;
+}
+
+void ManagedScriptContext::ReportException(MonoObject *obj, ManagedAssembly* ass)
+{
+	ManagedException_t exc;
+
+	/* Obtain the properties from the method itself */
+	ManagedObject* o = new ManagedObject(obj, FindClass(ass, "System", "Exception"));
+	MonoString* msg = nullptr;
+	MonoString* src = nullptr;
+	MonoString* stack = nullptr;
+	o->GetProperty(std::string("Message"), reinterpret_cast<void **>(&msg));
+	o->GetProperty(std::string("Source"), reinterpret_cast<void **>(&src));
+	o->GetProperty(std::string("StackTrace"), reinterpret_cast<void**>(&stack));
+
+	exc.stackTrace = mono_string_to_utf8(stack);
+	exc.source = mono_string_to_utf8(src);
+	exc.message = mono_string_to_utf8(msg);
 }
 
 

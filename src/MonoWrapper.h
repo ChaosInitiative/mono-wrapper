@@ -46,6 +46,13 @@ public:
 	T& operator->() { return *m_object; }
 };
 
+struct ManagedException_t
+{
+	std::string message;
+	std::string stackTrace;
+	std::string source;
+};
+
 //==============================================================================================//
 // ManagedBase
 //      base class for all Managed types
@@ -192,13 +199,14 @@ private:
 
 	friend class ManagedClass;
 	friend class ManagedMethod;
+	friend class ManagedScriptContext;
 
 public:
 	ManagedObject() = delete;
 	ManagedObject(ManagedObject&) = delete;
 	ManagedObject(ManagedObject&&) = delete;
 
-	ManagedObject(MonoObject* obj, class ManagedClass* cls)
+	explicit ManagedObject(MonoObject* obj, class ManagedClass* cls)
 	{
 		m_obj = obj;
 		m_class = cls;
@@ -212,6 +220,12 @@ public:
 	bool SetField(class ManagedField* prop, void* value);
 	bool GetProperty(class ManagedProperty* prop, void** outValue);
 	bool GetField(class ManagedField* prop, void* outValue);
+
+
+	bool SetProperty(const std::string& p, void* value);
+	bool SetField(const std::string& p, void* value);
+	bool GetProperty(const std::string& p, void** outValue);
+	bool GetField(const std::string&p, void* outValue);
 
 };
 
@@ -299,6 +313,7 @@ protected:
 
 	friend class ManagedClass;
 	friend class ManagedProperty;
+	friend class ManagedObject;
 };
 
 //==============================================================================================//
@@ -355,6 +370,7 @@ private:
 	friend class ManagedScriptContext;
 	friend class ManagedMethod;
 	friend class ManagedAssembly;
+	friend class ManagedObject;
 
 protected:
 	ManagedClass(ManagedAssembly* assembly, const std::string& ns, const std::string& cls);
@@ -388,7 +404,7 @@ public:
 	ManagedField* FindField(const std::string& name);
 	ManagedProperty* FindProperty(const std::string& prop);
 
-	ManagedObject* CreateInstance(void** parameters);
+	ManagedObject* CreateInstance(std::vector<MonoType*> signature, void** params);
 
 };
 
@@ -438,6 +454,8 @@ public:
 	void ClearReflectionInfo();
 
 	bool ValidateAgainstWhitelist(const std::vector<std::string> &whitelist);
+
+	void ReportException(MonoObject* obj, ManagedAssembly* ass);
 };
 
 //==============================================================================================//
