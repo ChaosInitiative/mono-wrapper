@@ -445,7 +445,7 @@ public:
 	[[nodiscard]] uint64_t UsedHeapSize() const;
 
 	class ManagedCompiler* CreateCompiler(const std::string& pathToCompilerBinary);
-	void DestoryCompiler(ManagedCompiler* c);
+	void DestroyCompiler(ManagedCompiler* c);
 };
 
 

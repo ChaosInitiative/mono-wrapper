@@ -348,7 +348,8 @@ ManagedMethod *ManagedClass::FindMethod(const std::string &name)
 ManagedScriptContext::ManagedScriptContext(const std::string& baseImage) :
 	m_baseImage(baseImage)
 {
-	m_domain = mono_jit_init(baseImage.c_str());
+	//m_domain = mono_jit_init(baseImage.c_str());
+	m_domain = mono_domain_create_appdomain(strdup(baseImage.c_str()), "mono-config");
 	//m_domain = mono_domain_create();
 	MonoAssembly* ass = mono_domain_assembly_open(m_domain, baseImage.c_str());
 	MonoImage* img = mono_assembly_get_image(ass);
@@ -492,7 +493,13 @@ bool ManagedScriptContext::ValidateAgainstWhitelist(const std::vector<std::strin
 
 ManagedScriptSystem::ManagedScriptSystem()
 {
-
+	// Create a SINGLE jit environment!
+	static MonoDomain* g_jitDomain = mono_jit_init("abcd");
+	if(!g_jitDomain) {
+		printf("Failure while creating mono jit!\n");
+		assert(0);
+		abort();
+	}
 }
 
 ManagedScriptSystem::~ManagedScriptSystem()
@@ -543,7 +550,7 @@ class ManagedCompiler *ManagedScriptSystem::CreateCompiler(const std::string& cb
 	return c;
 }
 
-void ManagedScriptSystem::DestoryCompiler(ManagedCompiler *c)
+void ManagedScriptSystem::DestroyCompiler(ManagedCompiler *c)
 {
 	DestroyContext(c->m_ctx);
 }
