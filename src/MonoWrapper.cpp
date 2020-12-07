@@ -248,10 +248,33 @@ ManagedField::ManagedField(MonoClassField *fld, class ManagedClass *cls) :
 	m_class(cls),
 	m_field(fld)
 {
-
+	const char* n = mono_field_get_name(fld);
+	m_name = n;
 }
 
 ManagedField::~ManagedField()
+{
+
+}
+
+
+//================================================================//
+//
+// Managed Property
+//
+//================================================================//
+
+ManagedProperty::ManagedProperty(MonoProperty* prop, ManagedClass* cls) :
+	m_class(cls),
+	m_property(prop)
+{
+	const char* n = mono_property_get_name(prop);
+	m_name = n;
+	m_getMethod = mono_property_get_get_method(prop);
+	m_setMethod = mono_property_get_set_method(prop);
+}
+
+ManagedProperty::~ManagedProperty()
 {
 
 }
@@ -361,6 +384,67 @@ ManagedMethod *ManagedClass::FindMethod(const std::string &name)
 	return nullptr;
 }
 
+ManagedField *ManagedClass::FindField(const std::string &name)
+{
+	for(auto& f : m_fields) {
+		if(f->m_name == name)
+			return f;
+	}
+	return nullptr;
+}
+
+ManagedProperty *ManagedClass::FindProperty(const std::string &prop)
+{
+	for(auto& p : m_properties) {
+		if(p->m_name == prop)
+			return p;
+	}
+	return nullptr;
+}
+
+//================================================================//
+//
+// Managed Object
+//
+//================================================================//
+
+bool ManagedObject::SetProperty(struct ManagedProperty *prop, void *value)
+{
+	MonoObject * exception = nullptr;
+	void* params[] = { value };
+
+	MonoObject* res = mono_runtime_invoke(prop->m_setMethod, m_obj, params, &exception);
+
+	if(exception) return false;
+	return true;
+}
+
+bool ManagedObject::SetField(struct ManagedField *prop, void *value)
+{
+	mono_field_set_value(m_obj, prop->RawField(), value);
+	return true;
+}
+
+bool ManagedObject::GetProperty(struct ManagedProperty *prop, void **outValue)
+{
+	MonoObject* exception = nullptr;
+	void* params[] = {outValue};
+
+	MonoObject* res = mono_runtime_invoke(prop->m_getMethod, m_obj, NULL, &exception);
+
+	if(!res || exception) {
+		return false;
+	}
+
+	*outValue = mono_object_unbox(res);
+	return true;
+}
+
+bool ManagedObject::GetField(struct ManagedField *prop, void *outValue)
+{
+	mono_field_get_value(m_obj, prop->RawField(), outValue);
+	return true;
+}
 
 
 

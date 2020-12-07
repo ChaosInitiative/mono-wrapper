@@ -50,6 +50,10 @@ int main(int argc, char **argv)
 	settings.configIsFile = false;
 	settings.configData = data;
 	settings.scriptSystemDomainName = "ChaosScriptPOC";
+	settings._malloc = malloc;
+	settings._free = free;
+	settings._calloc = calloc;
+	settings._realloc = realloc;
 
 	g_scriptSystem = new ManagedScriptSystem(settings);
 

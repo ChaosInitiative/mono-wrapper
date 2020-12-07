@@ -207,7 +207,12 @@ public:
 
 	[[nodiscard]] const ManagedClass& Class() const { return *m_class; }
 
-	[[nodiscard]] const MonoObject* InternalObject() const { return m_obj; }
+	[[nodiscard]] const MonoObject* RawObject() const { return m_obj; }
+
+	bool SetProperty(class ManagedProperty* prop, void* value);
+	bool SetField(class ManagedField* prop, void* value);
+	bool GetProperty(class ManagedProperty* prop, void** outValue);
+	bool GetField(class ManagedField* prop, void* outValue);
 
 };
 
@@ -274,11 +279,15 @@ class ManagedField : public ManagedBase<ManagedField>
 private:
 	MonoClassField* m_field;
 	class ManagedClass* m_class;
-
+	std::string m_name;
 public:
 	ManagedField() = delete;
 	ManagedField(ManagedField&) = delete;
 	ManagedField(ManagedField&&) = delete;
+
+	ManagedClass* Class() const { return m_class; };
+	MonoClassField* RawField() const { return m_field; };
+	const std::string& Name() const { return m_name; }
 
 protected:
 
@@ -298,6 +307,9 @@ class ManagedProperty : public ManagedBase<ManagedProperty>
 private:
 	MonoProperty* m_property;
 	class ManagedClass* m_class;
+	std::string m_name;
+	MonoMethod* m_getMethod;
+	MonoMethod* m_setMethod;
 
 public:
 	ManagedProperty() = delete;
@@ -305,12 +317,8 @@ public:
 	ManagedProperty(ManagedProperty&&) = delete;
 protected:
 
-	ManagedProperty(MonoProperty* prop, ManagedClass* cls) :
-		m_class(cls),
-		m_property(prop)
-	{
-
-	}
+	ManagedProperty(MonoProperty* prop, ManagedClass* cls);
+	~ManagedProperty();
 
 	friend class ManagedClass;
 	friend class ManagedMethod;
@@ -371,6 +379,10 @@ public:
 	[[nodiscard]] const std::vector<class ManagedProperty*> Properties() const { return m_properties; };
 
 	ManagedMethod* FindMethod(const std::string& name);
+
+	ManagedField* FindField(const std::string& name);
+
+	ManagedProperty* FindProperty(const std::string& prop);
 
 };
 
