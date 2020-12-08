@@ -239,7 +239,7 @@ void ManagedMethod::InvalidateHandle()
 bool ManagedMethod::MatchSignature(MonoType* returnval, std::vector<MonoType*> params)
 {
 	/* Pre-verification that the params are likely to be equal */
-	if(mono_signature_get_param_count(m_signature) != params.size()) {
+	if(m_paramCount != params.size()) {
 		return false;
 	}
 
@@ -261,7 +261,7 @@ bool ManagedMethod::MatchSignature(MonoType* returnval, std::vector<MonoType*> p
 
 bool ManagedMethod::MatchSignature(std::vector<MonoType*> params)
 {
-	if(mono_signature_get_param_count(m_signature) != params.size()) {
+	if(m_paramCount != params.size()) {
 		return false;
 	}
 
@@ -293,6 +293,30 @@ bool ManagedMethod::MatchSignature()
 
 	// Check param count is 0
 	return mono_signature_get_param_count(m_signature) == 0;
+}
+
+MonoObject *ManagedMethod::Invoke(ManagedObject *obj, void **params)
+{
+	MonoObject * exception = nullptr;
+	MonoObject* o = mono_runtime_invoke(m_method, obj, params, &exception);
+
+	if(exception) {
+		m_class->m_assembly->ReportException(exception);
+		return nullptr;
+	}
+	return o;
+}
+
+MonoObject *ManagedMethod::InvokeStatic(void **params)
+{
+	MonoObject * exception = nullptr;
+	MonoObject* o = mono_runtime_invoke(m_method, nullptr, params, &exception);
+
+	if(exception) {
+		m_class->m_assembly->ReportException(exception);
+		return nullptr;
+	}
+	return o;
 }
 
 
@@ -402,6 +426,12 @@ void ManagedClass::PopulateReflectionInfo()
 	assert(!m_valid);
 	if(m_valid) return;
 	void *iter = nullptr;
+
+	m_valueClass = mono_class_is_valuetype(m_class);
+	m_enumClass = mono_class_is_enum(m_class);
+	m_delegateClass = mono_class_is_delegate(m_class);
+	m_nullableClass = mono_class_is_nullable(m_class);
+	m_size = mono_class_instance_size(m_class);
 
 	MonoMethod *method;
 	while ((method = mono_class_get_methods(m_class, &iter)))
@@ -574,6 +604,11 @@ bool ManagedObject::GetField(const std::string &p, void *outValue)
 		}
 	}
 	return false;
+}
+
+MonoObject *ManagedObject::Invoke(struct ManagedMethod *method, void **params)
+{
+	return method->Invoke(this, params);
 }
 
 

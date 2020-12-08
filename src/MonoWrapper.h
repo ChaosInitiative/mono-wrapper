@@ -147,6 +147,11 @@ public:
 	/* Delete the object after this */
 	void Unload();
 	void InvalidateHandle() override;
+
+	inline void ReportException(MonoObject* exc)
+	{
+		m_ctx->ReportException(exc, this);
+	}
 };
 
 
@@ -191,6 +196,8 @@ public:
 //==============================================================================================//
 // ManagedObject
 //      Wrapper around a mono object
+//      Unlike the other classes here, the managed object can be copied around. It's just a
+//      wrapper around a MonoObject.
 //==============================================================================================//
 class ManagedObject : public ManagedBase<ManagedObject>
 {
@@ -204,8 +211,8 @@ private:
 
 public:
 	ManagedObject() = delete;
-	ManagedObject(ManagedObject&) = delete;
-	ManagedObject(ManagedObject&&) = delete;
+	ManagedObject(const ManagedObject& other) = delete;
+	ManagedObject(ManagedObject&& other) = delete;
 
 	explicit ManagedObject(MonoObject* obj, class ManagedClass* cls)
 	{
@@ -222,11 +229,12 @@ public:
 	bool GetProperty(class ManagedProperty* prop, void** outValue);
 	bool GetField(class ManagedField* prop, void* outValue);
 
-
 	bool SetProperty(const std::string& p, void* value);
 	bool SetField(const std::string& p, void* value);
 	bool GetProperty(const std::string& p, void** outValue);
 	bool GetField(const std::string&p, void* outValue);
+
+	MonoObject* Invoke(class ManagedMethod* method, void** params);
 
 };
 
@@ -286,6 +294,9 @@ public:
 	bool MatchSignature(MonoType* returnval, std::vector<MonoType*> params);
 	bool MatchSignature(std::vector<MonoType*> params);
 	bool MatchSignature();
+
+	MonoObject* Invoke(ManagedObject* obj, void** params);
+	MonoObject* InvokeStatic(void** params);
 };
 
 //==============================================================================================//
@@ -368,6 +379,13 @@ private:
 	ManagedAssembly* m_assembly;
 	mono_byte m_numConstructors;
 
+	bool m_valueClass : 1;
+	bool m_delegateClass : 1;
+	bool m_enumClass : 1;
+	bool m_nullableClass : 1;
+
+	uint32_t m_size; // Size in bytes
+
 	friend class ManagedScriptContext;
 	friend class ManagedMethod;
 	friend class ManagedAssembly;
@@ -388,16 +406,17 @@ public:
 	ManagedClass(ManagedClass&) = delete;
 
 	[[nodiscard]] std::string_view NamespaceName() const { return m_namespaceName; };
-
 	[[nodiscard]] std::string_view ClassName() const { return m_className; };
-
 	[[nodiscard]] const std::vector<class ManagedMethod*> Methods() const { return m_methods; };
-
 	[[nodiscard]] const std::vector<class ManagedField*> Fields() const { return m_fields; };
-
 	[[nodiscard]] const std::vector<class ManagedObject*> Attributes() const { return m_attributes; };
-
 	[[nodiscard]] const std::vector<class ManagedProperty*> Properties() const { return m_properties; };
+	uint32_t DataSize() const { return m_size; };
+	bool ValueClass() const { return m_valueClass; };
+	bool DelegateClass() const { return m_delegateClass; };
+	bool EnumClass() const { return m_enumClass; };
+	bool Nullable() const { return m_nullableClass; };
+
 
 	mono_byte NumConstructors() const;
 
