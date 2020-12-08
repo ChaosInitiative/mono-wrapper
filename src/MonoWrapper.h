@@ -148,10 +148,7 @@ public:
 	void Unload();
 	void InvalidateHandle() override;
 
-	inline void ReportException(MonoObject* exc)
-	{
-		m_ctx->ReportException(exc, this);
-	}
+	inline void ReportException(MonoObject* exc);
 };
 
 

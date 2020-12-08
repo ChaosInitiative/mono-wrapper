@@ -137,6 +137,11 @@ void ManagedAssembly::InvalidateHandle()
 	}
 }
 
+void ManagedAssembly::ReportException(MonoObject *exc)
+{
+	m_ctx->ReportException(exc, this);
+}
+
 //================================================================//
 //
 // Managed Type
@@ -736,8 +741,8 @@ ManagedScriptContext::~ManagedScriptContext()
 		if(a->m_assembly)
 			mono_assembly_close(a->m_assembly);
 	}
-	if(m_domain)
-		mono_domain_unload(m_domain);
+	//if(m_domain)
+	//	mono_domain_unload(m_domain);
 }
 
 bool ManagedScriptContext::LoadAssembly(const char* path)
