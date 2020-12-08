@@ -432,6 +432,7 @@ void ManagedClass::PopulateReflectionInfo()
 	m_delegateClass = mono_class_is_delegate(m_class);
 	m_nullableClass = mono_class_is_nullable(m_class);
 	m_size = mono_class_instance_size(m_class);
+	m_alignment = mono_class_min_align(m_class);
 
 	MonoMethod *method;
 	while ((method = mono_class_get_methods(m_class, &iter)))
@@ -521,6 +522,99 @@ mono_byte ManagedClass::NumConstructors() const
 {
 	return m_numConstructors;
 }
+
+bool ManagedClass::ImplementsInterface(ManagedClass *interface)
+{
+	return mono_class_implements_interface(m_class, interface->m_class);
+}
+
+bool ManagedClass::DerivedFromClass(ManagedClass* cls)
+{
+	return mono_class_is_subclass_of(m_class, cls->m_class, true);
+}
+
+bool ManagedClass::DerivedFromClass(MonoClass* cls)
+{
+	return mono_class_is_subclass_of(m_class, cls, true);
+}
+
+
+bool ManagedClass::IsVoid()
+{
+	return m_class == mono_get_void_class();
+}
+
+bool ManagedClass::IsInt16()
+{
+	return m_class == mono_get_int16_class();
+}
+
+bool ManagedClass::IsInt32()
+{
+	return m_class == mono_get_int32_class();
+}
+
+bool ManagedClass::IsInt64()
+{
+	return m_class == mono_get_int64_class();
+}
+
+bool ManagedClass::IsDouble()
+{
+	return m_class == mono_get_double_class();
+}
+
+bool ManagedClass::IsIntptr()
+{
+	return m_class == mono_get_intptr_class();
+}
+
+bool ManagedClass::IsThread()
+{
+	return m_class == mono_get_thread_class();
+}
+
+bool ManagedClass::IsArray()
+{
+	return m_class == mono_get_array_class();
+}
+
+bool ManagedClass::IsByte()
+{
+	return m_class == mono_get_byte_class();
+}
+
+bool ManagedClass::IsChar()
+{
+	return m_class == mono_get_char_class();
+}
+
+bool ManagedClass::IsUInt32()
+{
+	return m_class == mono_get_uint32_class();
+}
+
+bool ManagedClass::IsUInt16()
+{
+	return m_class == mono_get_uint32_class();
+}
+
+bool ManagedClass::IsUInt64()
+{
+	return m_class == mono_get_uint64_class();
+}
+
+bool ManagedClass::IsUIntptr()
+{
+	return m_class == mono_get_uintptr_class();
+}
+
+bool ManagedClass::IsBool()
+{
+	return m_class == mono_get_boolean_class();
+}
+
+
 
 //================================================================//
 //

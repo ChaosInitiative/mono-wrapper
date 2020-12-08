@@ -375,10 +375,11 @@ private:
 	std::string m_namespaceName;
 	std::string m_className;
 	MonoClass* m_class;
-	bool m_populated;
 	ManagedAssembly* m_assembly;
 	mono_byte m_numConstructors;
+	mono_byte m_alignment;
 
+	bool m_populated : 1;
 	bool m_valueClass : 1;
 	bool m_delegateClass : 1;
 	bool m_enumClass : 1;
@@ -416,6 +417,7 @@ public:
 	bool DelegateClass() const { return m_delegateClass; };
 	bool EnumClass() const { return m_enumClass; };
 	bool Nullable() const { return m_nullableClass; };
+	int Alignment() const { return m_alignment; };
 
 
 	mono_byte NumConstructors() const;
@@ -426,6 +428,25 @@ public:
 
 	ManagedObject* CreateInstance(std::vector<MonoType*> signature, void** params);
 
+	bool ImplementsInterface(ManagedClass* interface);
+	bool DerivedFromClass(ManagedClass* cls);
+	bool DerivedFromClass(MonoClass* cls);
+
+	inline bool IsVoid();
+	inline bool IsInt16();
+	inline bool IsInt32();
+	inline bool IsInt64();
+	inline bool IsDouble();
+	inline bool IsIntptr();
+	inline bool IsThread();
+	inline bool IsArray();
+	inline bool IsByte();
+	inline bool IsChar();
+	inline bool IsUInt32();
+	inline bool IsUInt16();
+	inline bool IsUInt64();
+	inline bool IsUIntptr();
+	inline bool IsBool();
 };
 
 /* NOTE: this class cannot have a handle pointed at it */
