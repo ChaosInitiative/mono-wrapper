@@ -9,3 +9,4 @@ build*
 .vscode
 mono_crash*
 obj/
+bin/
