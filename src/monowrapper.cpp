@@ -15,7 +15,7 @@
 #include <mono/metadata/loader.h>
 #include <mono/metadata/profiler.h>
 
-#include "MonoWrapper.h"
+#include "monowrapper.h"
 
 #include <assert.h>
 #include <string.h>
@@ -28,6 +28,7 @@ struct _MonoProfiler {
 	uint64_t totalMoves;
 	uint64_t bytesMoved;
 	uint64_t bytesAlloc;
+	ManagedScriptSystem* scriptsys;
 };
 
 MonoProfiler g_monoProfiler;
@@ -41,7 +42,6 @@ static void Profiler_ContextUnloaded(MonoProfiler* prof, MonoAppContext* ctx);
 static void Profiler_GCEvent(MonoProfiler* prof, MonoProfilerGCEvent ev, uint32_t gen, mono_bool isSerial);
 static void Profiler_GCAlloc(MonoProfiler* prof, MonoObject* obj);
 static void Profiler_GCResize(MonoProfiler* prof, uintptr_t size);
-
 
 //================================================================//
 //
@@ -109,7 +109,7 @@ bool ManagedAssembly::ValidateAgainstWhitelist(const std::vector<std::string>& w
 				found = true;
 			}
 		}
-		if(!found) 
+		if(!found)
 			return false;
 	}
 	return true;
@@ -195,7 +195,7 @@ ManagedMethod::ManagedMethod(MonoMethod *method, ManagedClass *cls) :
 
 	m_name = mono_method_get_name(m_method);
 	m_paramCount = mono_signature_get_param_count(m_signature);
-	
+
 	m_returnType = new ManagedType(mono_signature_get_return_type(m_signature));
 
 	if (!m_attrInfo)
@@ -300,10 +300,10 @@ bool ManagedMethod::MatchSignature()
 	return mono_signature_get_param_count(m_signature) == 0;
 }
 
-MonoObject *ManagedMethod::Invoke(ManagedObject *obj, void **params)
+MonoObject *ManagedMethod::Invoke(ManagedObject *obj, void **params, MonoObject** _exc)
 {
 	MonoObject * exception = nullptr;
-	MonoObject* o = mono_runtime_invoke(m_method, obj, params, &exception);
+	MonoObject* o = mono_runtime_invoke(m_method, obj, params, _exc ? _exc : &exception);
 
 	if(exception) {
 		m_class->m_assembly->ReportException(exception);
@@ -312,10 +312,10 @@ MonoObject *ManagedMethod::Invoke(ManagedObject *obj, void **params)
 	return o;
 }
 
-MonoObject *ManagedMethod::InvokeStatic(void **params)
+MonoObject *ManagedMethod::InvokeStatic(void **params, MonoObject** _exc)
 {
 	MonoObject * exception = nullptr;
-	MonoObject* o = mono_runtime_invoke(m_method, nullptr, params, &exception);
+	MonoObject* o = mono_runtime_invoke(m_method, nullptr, params, _exc ? _exc : &exception);
 
 	if(exception) {
 		m_class->m_assembly->ReportException(exception);
@@ -501,7 +501,7 @@ ManagedProperty *ManagedClass::FindProperty(const std::string &prop)
 	return nullptr;
 }
 
-/* Creates an instance of a this class */ 
+/* Creates an instance of a this class */
 ManagedObject* ManagedClass::CreateInstance(std::vector<MonoType*> signature, void** params)
 {
 	for(auto& method : m_methods) {
@@ -632,6 +632,9 @@ bool ManagedObject::SetProperty(struct ManagedProperty *prop, void *value)
 	MonoObject * exception = nullptr;
 	void* params[] = { value };
 
+	if(!prop->m_setMethod)
+		return false;
+
 	MonoObject* res = mono_runtime_invoke(prop->m_setMethod, m_obj, params, &exception);
 
 	if(exception) return false;
@@ -648,6 +651,9 @@ bool ManagedObject::GetProperty(struct ManagedProperty *prop, void **outValue)
 {
 	MonoObject* exception = nullptr;
 	void* params[] = {outValue};
+
+	if(!prop->m_getMethod)
+		return false;
 
 	MonoObject* res = mono_runtime_invoke(prop->m_getMethod, m_obj, NULL, &exception);
 
@@ -721,28 +727,42 @@ MonoObject *ManagedObject::Invoke(struct ManagedMethod *method, void **params)
 ManagedScriptContext::ManagedScriptContext(const std::string& baseImage) :
 	m_baseImage(baseImage)
 {
-	//m_domain = mono_jit_init(baseImage.c_str());
-	m_domain = mono_domain_create_appdomain(strdup(baseImage.c_str()), strdup("mono-config"));
-	//m_domain = mono_domain_create();
-
-	MonoAssembly* ass = mono_domain_assembly_open(m_domain, baseImage.c_str());
-	MonoImage* img = mono_assembly_get_image(ass);
-	ManagedAssembly* newass = new ManagedAssembly(this, baseImage, img, ass);
-	m_loadedAssemblies.push_back(newass);
-	newass->PopulateReflectionInfo();
 }
 
 ManagedScriptContext::~ManagedScriptContext()
 {
-	for(auto& a : m_loadedAssemblies) 
+	for(auto& a : m_loadedAssemblies)
 	{
 		if(a->m_image)
 			mono_image_close(a->m_image);
 		if(a->m_assembly)
 			mono_assembly_close(a->m_assembly);
 	}
-	//if(m_domain)
-	//	mono_domain_unload(m_domain);
+}
+
+bool ManagedScriptContext::Init()
+{
+	//m_domain = mono_domain_create_appdomain("abcd", nullptr);
+	m_domain = g_jitDomain;
+
+	MonoAssembly* ass = mono_domain_assembly_open(m_domain, m_baseImage.c_str());
+	if(!ass)
+	{
+		return false;
+	}
+
+	MonoImage* img = mono_assembly_get_image(ass);
+
+	if(!img)
+	{
+		return false;
+	}
+	ManagedAssembly* newass = new ManagedAssembly(this, m_baseImage, img, ass);
+	m_loadedAssemblies.push_back(newass);
+	newass->PopulateReflectionInfo();
+
+	m_initialized = true;
+	return true;
 }
 
 bool ManagedScriptContext::LoadAssembly(const char* path)
@@ -814,6 +834,45 @@ ManagedClass* ManagedScriptContext::FindClass(ManagedAssembly* assembly, const s
 	return nullptr;
 }
 
+/* Used to locate a class not added by any assemblies explicitly loaded by the user */
+/* These assemblies are usually going to be system assemblies or members of the C# standard library */
+MonoClass* ManagedScriptContext::FindSystemClass(const std::string& ns, const std::string& cls)
+{
+	struct pvt_t {
+		ManagedScriptContext* _this;
+		const char* ns;
+		const char* cls;
+		bool isdone;
+		MonoClass* result;
+	} pvt;
+
+	pvt.cls = cls.c_str();
+	pvt.ns = ns.c_str();
+	pvt._this = this;
+	pvt.result = nullptr;
+	pvt.isdone = false;
+
+	mono_assembly_foreach([](void* ass, void* pvt) {
+		MonoAssembly* _ass = static_cast<MonoAssembly*>(ass);
+		pvt_t* _pvt = static_cast<pvt_t*>(pvt);
+
+		if(_pvt->isdone)
+			return;
+
+		MonoImage* img = mono_assembly_get_image(_ass);
+		if(!img)
+			return;
+
+		MonoClass* res = mono_class_from_name(img, _pvt->ns, _pvt->cls);
+
+		if(res) {
+			_pvt->isdone = true;
+			_pvt->result = res;
+		}
+	}, &pvt);
+
+	return pvt.result;
+}
 
 ManagedAssembly* ManagedScriptContext::FindAssembly(const std::string &path)
 {
@@ -860,34 +919,71 @@ bool ManagedScriptContext::ValidateAgainstWhitelist(const std::vector<std::strin
 
 void ManagedScriptContext::ReportException(MonoObject *obj, ManagedAssembly* ass)
 {
-	ManagedException_t exc;
-
-	/* Obtain the properties from the method itself */
-	ManagedObject* o = new ManagedObject(obj, FindClass(ass, "System", "Exception"));
-	MonoString* msg = nullptr;
-	MonoString* src = nullptr;
-	MonoString* stack = nullptr;
-	o->GetProperty(std::string("Message"), reinterpret_cast<void **>(&msg));
-	o->GetProperty(std::string("Source"), reinterpret_cast<void **>(&src));
-	o->GetProperty(std::string("StackTrace"), reinterpret_cast<void**>(&stack));
-
-	char* stackTraceStr = mono_string_to_utf8(stack);
-	char* sourceStr = mono_string_to_utf8(src);
-	char* messageStr = mono_string_to_utf8(msg);
-
-	exc.stackTrace = (const char*)stackTraceStr;
-	exc.source = (const char*)sourceStr;
-	exc.message = (const char*)messageStr;
-
-	mono_free(stackTraceStr);
-	mono_free(sourceStr);
-	mono_free(messageStr);
+	auto exc = this->GetExceptionDescriptor(obj);
 
 	for(auto& c : m_callbacks) {
 		c(this, ass, obj, exc);
 	}
 }
 
+ManagedException_t ManagedScriptContext::GetExceptionDescriptor( MonoObject *exception )
+{
+	ManagedException_t exc;
+
+	/* Make sure that the baseclass of the exception is System.Exception. If not, we've got some weird object that we shouldn't have */
+	MonoClass* cls = mono_object_get_class(exception);
+	MonoClass* excClass = FindSystemClass("System", "Exception");
+	if(!mono_object_isinst(exception, excClass))
+	{
+		return exc;
+	}
+
+	/* Obtain the properties by iterating through the class's props */
+	MonoProperty* propMsg = mono_class_get_property_from_name(cls, "Message");
+	MonoProperty* propSrc = mono_class_get_property_from_name(cls, "Source");
+	MonoProperty* propST = mono_class_get_property_from_name(cls, "StackTrace");
+
+	/* Obtain the properties */
+	/* This is a big weird and unoptimized because mono I guess */
+	MonoObject* msg = nullptr;
+	MonoObject* src = nullptr;
+	MonoObject* stack = nullptr;
+	MonoObject* propexcept = nullptr;
+	msg = mono_property_get_value(propMsg, exception, nullptr, &propexcept);
+	src = mono_property_get_value(propSrc, exception, nullptr, &propexcept);
+	stack = mono_property_get_value(propST, exception, nullptr, &propexcept);
+
+	if(msg) {
+		char* buf = mono_string_to_utf8(mono_object_to_string(msg, nullptr));
+		exc.message = (const char*)buf;
+		mono_free(buf);
+	}
+	if(src) {
+		char* buf = mono_string_to_utf8(mono_object_to_string(src, nullptr));
+		exc.source = (const char*)buf;
+		mono_free(buf);
+	}
+	if(stack) {
+		char* buf = mono_string_to_utf8(mono_object_to_string(stack, nullptr));
+		exc.stackTrace = (const char*)buf;
+		mono_free(buf);
+	}
+
+	exc.klass = mono_class_get_name(cls);
+	exc.ns = mono_class_get_namespace(cls);
+
+	MonoObject* pexc = nullptr;
+	char* str = mono_string_to_utf8(mono_object_to_string(exception, &pexc));
+
+	if(!pexc && str) {
+		exc.string_rep = (const char*)str;
+	}
+
+	if(str)
+		mono_free(str);
+
+	return exc;
+}
 
 //================================================================//
 //
@@ -896,7 +992,8 @@ void ManagedScriptContext::ReportException(MonoObject *obj, ManagedAssembly* ass
 //================================================================//
 
 ManagedScriptSystem::ManagedScriptSystem(ManagedScriptSystemSettings_t settings) :
-	m_settings(settings)
+	m_settings(settings),
+	m_curFrame(nullptr)
 {
 	/* Basically just a guard to ensure we dont have multiple per process */
 	static bool g_managedScriptSystemExists = false;
@@ -911,8 +1008,12 @@ ManagedScriptSystem::ManagedScriptSystem(ManagedScriptSystemSettings_t settings)
 	else
 		mono_config_parse_memory(settings.configData);
 
+	/* Push a root profiling context */
+	this->PushProfilingContext();
+
 	/* Create and register the new profiler */
 	g_monoProfiler.handle = mono_profiler_create(&g_monoProfiler);
+	g_monoProfiler.scriptsys = this;
 	mono_profiler_set_runtime_initialized_callback(g_monoProfiler.handle, Profiler_RuntimeInit);
 	mono_profiler_set_runtime_shutdown_begin_callback(g_monoProfiler.handle, Profiler_RuntimeShutdownStart);
 	mono_profiler_set_runtime_shutdown_end_callback(g_monoProfiler.handle, Profiler_RuntimeShutdownEnd);
@@ -921,6 +1022,7 @@ ManagedScriptSystem::ManagedScriptSystem(ManagedScriptSystemSettings_t settings)
 	mono_profiler_set_gc_resize_callback(g_monoProfiler.handle, Profiler_GCResize);
 	mono_profiler_set_context_loaded_callback(g_monoProfiler.handle, Profiler_ContextLoaded);
 	mono_profiler_set_context_unloaded_callback(g_monoProfiler.handle, Profiler_ContextUnloaded);
+
 
 	/* Register our memory allocator for mono */
 	if(!settings._malloc) settings._malloc = malloc;
@@ -950,7 +1052,7 @@ ManagedScriptSystem::~ManagedScriptSystem()
 {
 	// contexts should be freed before shutdown
 	//assert(m_contexts.size() == 0);
-	for(auto c : m_contexts) { 
+	for(auto c : m_contexts) {
 		delete (c);
 	}
 	mono_jit_cleanup(g_jitDomain);
@@ -959,6 +1061,13 @@ ManagedScriptSystem::~ManagedScriptSystem()
 ManagedScriptContext* ManagedScriptSystem::CreateContext(const char* image)
 {
 	ManagedScriptContext* ctx = new ManagedScriptContext(image);
+
+	if(!ctx->Init())
+	{
+		delete ctx;
+		return nullptr;
+	}
+
 	m_contexts.push_back(ctx);
 	return ctx;
 }
@@ -1029,6 +1138,31 @@ void ManagedScriptSystem::RunGCCollectAll()
 	}
 }
 
+void ManagedScriptSystem::PushProfilingContext()
+{
+	m_profilingData.push(ManagedProfilingData_t());
+	m_curFrame = &m_profilingData.top();
+}
+
+void ManagedScriptSystem::PopProfilingContext()
+{
+	/* There should always be at least one frame in the stack */
+	if(m_profilingData.size() > 1)
+	{
+		m_profilingData.pop();
+		m_curFrame = &m_profilingData.top();
+	}
+}
+
+void ManagedScriptSystem::SetProfilingSettings(ManagedProfilingSettings_t settings)
+{
+	m_profilingSettings = settings;
+	if(m_profilingSettings.profileAllocations) {
+		mono_profiler_enable_allocations();
+	}
+}
+
+
 //================================================================//
 //
 // Managed Compiler
@@ -1082,46 +1216,50 @@ bool ManagedCompiler::Compile(const std::string &buildDir, const std::string &ou
 
 static void Profiler_RuntimeInit(MonoProfiler* prof)
 {
-	prof->bytesMoved = 0;
-	prof->totalAllocs = 0;
-	prof->totalMoves = 0;
 }
 
 static void Profiler_RuntimeShutdownStart(MonoProfiler* prof)
 {
+	auto& ctx = prof->scriptsys->CurrentProfilingData();
 
 }
 
 static void Profiler_RuntimeShutdownEnd(MonoProfiler* prof)
 {
+	auto& ctx = prof->scriptsys->CurrentProfilingData();
 
 }
 
-static void Profiler_ContextLoaded(MonoProfiler* prof, MonoAppContext* ctx)
+static void Profiler_ContextLoaded(MonoProfiler* prof, MonoAppContext* _ctx)
 {
-
+	auto& ctx = prof->scriptsys->CurrentProfilingData();
+	ctx.totalContextLoads++;
 }
 
-static void Profiler_ContextUnloaded(MonoProfiler* prof, MonoAppContext* ctx)
+static void Profiler_ContextUnloaded(MonoProfiler* prof, MonoAppContext* _ctx)
 {
-
+	auto& ctx = prof->scriptsys->CurrentProfilingData();
+	ctx.totalContextUnloads++;
 }
 
 static void Profiler_GCEvent(MonoProfiler* prof, MonoProfilerGCEvent ev, uint32_t gen, mono_bool isSerial)
 {
+	auto& ctx = prof->scriptsys->CurrentProfilingData();
 
 }
 
 static void Profiler_GCAlloc(MonoProfiler* prof, MonoObject* obj)
 {
-	prof->bytesAlloc += mono_object_get_size(obj);
-	prof->totalAllocs++;
+	auto& ctx = prof->scriptsys->CurrentProfilingData();
+	ctx.bytesAlloc += mono_object_get_size(obj);
+	ctx.totalAllocs++;
 }
 
 static void Profiler_GCResize(MonoProfiler* prof, uintptr_t size)
 {
-	prof->totalMoves++;
-	prof->bytesMoved += size;
+	auto& ctx = prof->scriptsys->CurrentProfilingData();
+	ctx.totalMoves++;
+	ctx.bytesMoved += size;
 }
 
 

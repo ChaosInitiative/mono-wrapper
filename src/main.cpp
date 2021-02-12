@@ -8,8 +8,8 @@
 #include <mono/metadata/reflection.h>
 #include <mono/metadata/mono-debug.h>
 #include <signal.h>
-#include "MonoWrapper.h"
-#include "Metrics.hpp"
+#include "monowrapper.h"
+#include "metrics.hpp"
 
 #include <string>
 #include <vector>

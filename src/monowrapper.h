@@ -1,3 +1,4 @@
+
 #pragma once
 
 #include <vector>
@@ -7,6 +8,16 @@
 #include <unordered_map>
 #include <list>
 #include <functional>
+#include <stack>
+
+/* Mono includes */
+#include <mono/metadata/mono-config.h>
+#include <mono/metadata/appdomain.h>
+#include <mono/metadata/assembly.h>
+#include <mono/metadata/class.h>
+#include <mono/metadata/environment.h>
+#include <mono/metadata/object.h>
+#include <mono/metadata/mono-gc.h>
 
 template<class T>
 class ManagedBase;
@@ -52,6 +63,9 @@ struct ManagedException_t
 	std::string message;
 	std::string stackTrace;
 	std::string source;
+	std::string klass;
+	std::string ns;
+	std::string string_rep; // String representation of the exception (object.ToString)
 };
 
 //==============================================================================================//
@@ -183,10 +197,10 @@ public:
 	bool IsRef() const { return m_isRef; };
 
 	bool IsPtr() const { return m_isPtr; };
-	
+
 	bool Equals(const ManagedType* other) const;
 
-	[[nodiscard]] const std::string& Name() const; 
+	const std::string& Name() const;
 };
 
 
@@ -217,9 +231,9 @@ public:
 		m_class = cls;
 	}
 
-	[[nodiscard]] const ManagedClass& Class() const { return *m_class; }
+	const ManagedClass& Class() const { return *m_class; }
 
-	[[nodiscard]] const MonoObject* RawObject() const { return m_obj; }
+	const MonoObject* RawObject() const { return m_obj; }
 
 	bool SetProperty(class ManagedProperty* prop, void* value);
 	bool SetField(class ManagedField* prop, void* value);
@@ -276,15 +290,15 @@ protected:
 	void InvalidateHandle() override;
 
 public:
-	[[nodiscard]] ManagedAssembly* Assembly() const;
+	ManagedAssembly* Assembly() const;
 
-	[[nodiscard]] ManagedClass* Class() const;
+	ManagedClass* Class() const;
 
-	[[nodiscard]] const std::vector<ManagedObject*>& Attributes() const { return m_attributes; }
+	const std::vector<ManagedObject*>& Attributes() const { return m_attributes; }
 
-	[[nodiscard]] const std::string& Name() const { return m_name; };
+	const std::string& Name() const { return m_name; };
 
-	[[nodiscard]] int ParamCount() const { return m_paramCount; };
+	int ParamCount() const { return m_paramCount; };
 
 	MonoMethod* RawMethod() { return m_method; };
 
@@ -292,8 +306,8 @@ public:
 	bool MatchSignature(std::vector<MonoType*> params);
 	bool MatchSignature();
 
-	MonoObject* Invoke(ManagedObject* obj, void** params);
-	MonoObject* InvokeStatic(void** params);
+	MonoObject* Invoke(ManagedObject* obj, void** params, MonoObject** exception = nullptr);
+	MonoObject* InvokeStatic(void** params, MonoObject** exception = nullptr);
 };
 
 //==============================================================================================//
@@ -352,9 +366,9 @@ protected:
 	friend class ManagedObject;
 
 public:
-	[[nodiscard]] const MonoProperty* InternalProperty() const { return m_property; };
+	const MonoProperty* InternalProperty() const { return m_property; };
 
-	[[nodiscard]] const ManagedClass& Class() const { return *m_class; }
+	const ManagedClass& Class() const { return *m_class; }
 };
 
 //==============================================================================================//
@@ -403,12 +417,12 @@ public:
 	ManagedClass(ManagedClass&& c) = delete;
 	ManagedClass(ManagedClass&) = delete;
 
-	[[nodiscard]] std::string_view NamespaceName() const { return m_namespaceName; };
-	[[nodiscard]] std::string_view ClassName() const { return m_className; };
-	[[nodiscard]] const std::vector<class ManagedMethod*> Methods() const { return m_methods; };
-	[[nodiscard]] const std::vector<class ManagedField*> Fields() const { return m_fields; };
-	[[nodiscard]] const std::vector<class ManagedObject*> Attributes() const { return m_attributes; };
-	[[nodiscard]] const std::vector<class ManagedProperty*> Properties() const { return m_properties; };
+	const std::string& NamespaceName() const { return m_namespaceName; };
+	const std::string& ClassName() const { return m_className; };
+	const std::vector<class ManagedMethod*>& Methods() const { return m_methods; };
+	const std::vector<class ManagedField*>& Fields() const { return m_fields; };
+	const std::vector<class ManagedObject*>& Attributes() const { return m_attributes; };
+	const std::vector<class ManagedProperty*>& Properties() const { return m_properties; };
 	uint32_t DataSize() const { return m_size; };
 	bool ValueClass() const { return m_valueClass; };
 	bool DelegateClass() const { return m_delegateClass; };
@@ -453,11 +467,12 @@ public:
 //==============================================================================================//
 class ManagedScriptContext
 {
-private:
+public:
 
 	std::list<ManagedAssembly*> m_loadedAssemblies;
 	MonoDomain* m_domain;
 	std::string m_baseImage;
+	bool m_initialized = false;
 
 public:
 	ManagedScriptContext() = delete;
@@ -483,13 +498,21 @@ public:
 
 	bool UnloadAssembly(const std::string& name);
 
+	bool Init();
+
 	/* Performs a class search in all loaded assemblies */
 	/* If you have the assembly name, please use the alternative version of this function */
 	ManagedClass* FindClass(const std::string& ns, const std::string& cls);
 
 	ManagedClass* FindClass(ManagedAssembly* assembly, const std::string& ns, const std::string& cls);
 
+	/* Returns a pointer to a raw MonoClass object corresponding to the specified class */
+	/* This doesn't cache the class in a lookup table. You'll need to save the class yourself */
+	MonoClass* FindSystemClass(const std::string& ns, const std::string& cls);
+
 	ManagedAssembly* FindAssembly(const std::string &path);
+
+	ManagedException_t GetExceptionDescriptor(MonoObject* exception);
 
 	/* Clears all reflection info stored in each assembly description */
 	/* WARNING: this will invalidate your handles! */
@@ -502,6 +525,8 @@ public:
 	void RegisterExceptionCallback(ExceptionCallbackT callback) {
 		m_callbacks.push_back(callback);
 	}
+
+	MonoDomain * RawDomain() const { return m_domain; };
 };
 
 //==============================================================================================//
@@ -537,12 +562,44 @@ struct ManagedScriptSystemSettings_t
 
 };
 
+struct ManagedProfilingData_t
+{
+	size_t bytesMoved; // How many bytes have been moved in total
+	size_t totalMoves; // Individual move operations
+	size_t bytesAlloc; // Number of bytes allocated
+	size_t totalAllocs; // Number of allocation operations
+	size_t totalContextUnloads;
+	size_t totalContextLoads;
+};
+
+struct ManagedProfilingSettings_t
+{
+	/* Profiling enable */
+	bool enableProfiling : 1;
+	/* Things to profile */
+	bool profileCalls : 1;
+	bool profileCoverage : 1;
+	bool profileAllocations : 1;
+	bool profileDomain : 1;
+	bool profileContext : 1;
+	bool profileAssembly : 1;
+	bool profileImage : 1;
+	bool profileExceptions : 1;
+	bool profileGC : 1;
+	bool profileThread : 1; /* Profile threading events */
+	bool recordThreadEvents : 1; /* Log thread start/stop events in a timestamped log */
+};
+
 class ManagedScriptSystem
 {
 private:
 	std::vector<ManagedScriptContext*> m_contexts;
+	std::stack<ManagedProfilingData_t> m_profilingData;
 	MonoAllocatorVTable m_allocator;
 	ManagedScriptSystemSettings_t m_settings;
+	ManagedProfilingData_t* m_curFrame;
+	bool m_debugEnabled;
+	ManagedProfilingSettings_t m_profilingSettings;
 public:
 	explicit ManagedScriptSystem(
 			ManagedScriptSystemSettings_t settings
@@ -558,11 +615,11 @@ public:
 
 	void DestroyContext(ManagedScriptContext* ctx);
 
-	[[nodiscard]] int NumActiveContexts() const { return m_contexts.size(); };
+	int NumActiveContexts() const { return m_contexts.size(); };
 
-	[[nodiscard]] uint64_t HeapSize() const;
+	uint64_t HeapSize() const;
 
-	[[nodiscard]] uint64_t UsedHeapSize() const;
+	uint64_t UsedHeapSize() const;
 
 	class ManagedCompiler* CreateCompiler(const std::string& pathToCompilerBinary);
 	void DestroyCompiler(ManagedCompiler* c);
@@ -571,27 +628,19 @@ public:
 
 	void ReportProfileStats();
 
+	void EnableDebugging(bool enable);
+	bool IsDebuggingEnabled() const { return m_debugEnabled; };
+
+	ManagedProfilingSettings_t GetProfilingSettings() { return m_profilingSettings; };
+	void SetProfilingSettings(ManagedProfilingSettings_t settings);
+
 	uint32_t MaxGCGeneration();
 	void RunGCCollect(uint32_t gen);
 	void RunGCCollectAll();
 
-};
-
-struct ManagedProfilingSettings_t
-{
-	/* Profiling enable */
-	bool enableProfiling : 1;
-	/* Things to profile */
-	bool profileCalls : 1;
-	bool profileAllocations : 1;
-	bool profileDomain : 1;
-	bool profileContext : 1;
-	bool profileAssembly : 1;
-	bool profileImage : 1;
-	bool profileExceptions : 1;
-	bool profileGC : 1;
-	bool profileThread : 1; /* Profile threading events */
-	bool recordThreadEvents : 1; /* Log thread start/stop events in a timestamped log */
+	void PushProfilingContext();
+	void PopProfilingContext();
+	inline ManagedProfilingData_t &CurrentProfilingData() { return *m_curFrame; }; // This needs to be fast
 };
 
 //==============================================================================================//
