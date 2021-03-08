@@ -1,9 +1,16 @@
-## ChaosScript Proof of Concept
+## Mono Wrapper
 
-Currently this repo contains small ChaosScript tests, a C++ Mono wrapper and a script system interface.
+Simple C++ wrapper around the Mono runtime. This is still work in progress, so you'll probably want to hold off on using it!
 
-Only tested on Linux, as this is a proof of concept and where I do my development. Everything is being written
-with standard C++, so porting to Windows should be as simple as linking against the mono library.
+### Requirements
+
+C++17 compliant compiler
+
+### TODO
+
+* Move to CMake
+* Support windows
+* CI
 
 ### Building
 
