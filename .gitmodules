@@ -1,0 +1,3 @@
+[submodule "thirdparty/dotnet-runtime"]
+	path = thirdparty/dotnet-runtime
+	url = https://github.com/dotnet/runtime
