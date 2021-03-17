@@ -366,7 +366,7 @@ protected:
 	friend class ManagedObject;
 
 public:
-	const MonoProperty* InternalProperty() const { return m_property; };
+	const MonoProperty* RawProperty() const { return m_property; };
 
 	const ManagedClass& Class() const { return *m_class; }
 };
