@@ -2,6 +2,13 @@ using System;
 
 namespace WrapperTests
 {
+	public class TestClass
+	{
+		public string value;
+		public bool boolean;
+		public int integer;
+	}
+	
 	public class WrapperTestClass
 	{
 		public WrapperTestClass()
@@ -19,6 +26,20 @@ namespace WrapperTests
 		{
 			Console.WriteLine("Test2 method called");
 			return true;
+		}
+		
+		public TestClass NonTrivialTypeTest(string value, bool b, int i)
+		{
+			TestClass c = new TestClass();
+			c.value = value;
+			c.boolean = b;
+			c.integer = i;
+			return c;
+		}
+		
+		public void ExeptionTest()
+		{
+			throw new Exception("AAAAAAAAAAAAAA");
 		}
 	}
 }

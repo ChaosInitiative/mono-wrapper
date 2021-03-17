@@ -57,7 +57,7 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/lib/${PLATFORM})
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/bin/)
 
 include_directories(thirdparty/mono/include)
-link_directories(thirdparty/mono/lib/${PLATFORM})
+link_directories(thirdparty/mono/lib/${PLATFORM} ${CMAKE_CURRENT_SOURCE_DIR}/lib/${PLATFORM})
 
 ##################################################################################################################
 project(MonoWrapper C CXX)
@@ -101,7 +101,7 @@ if(DEFINED BUILD_TESTS)
 	
 	add_executable(MonoWrapperTest ${TEST_SRC})
 	
-	target_link_libraries(MonoWrapperTest PUBLIC coreclr MonoWrapper)
+	target_link_libraries(MonoWrapperTest PUBLIC MonoWrapper coreclr)
 	target_include_directories(MonoWrapperTest PUBLIC src)
 	
 	INSTALL(TARGETS	MonoWrapperTest
@@ -112,5 +112,9 @@ if(DEFINED BUILD_TESTS)
 	BUILD_DOTNET(test1)
 	
 	INSTALL_RANDOM_FILE(MonoWrapperTest src/mono-config bin/mono-config)
+	if(UNIX)
+		INSTALL_RANDOM_FILE(MonoWrapperTest thirdparty/mono/lib/linux-x64/libcoreclr.so bin/libmonosgen-2.0.so.1)
+		INSTALL_RANDOM_FILE(MonoWrapperTest scripts/run-tests.sh bin/run-tests.sh)
+	endif()
 endif()
 ##################################################################################################################
