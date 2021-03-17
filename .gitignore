@@ -11,3 +11,5 @@ mono_crash*
 obj/
 bin/
 compile_commands.json
+lib/
+build
