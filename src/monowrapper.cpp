@@ -1095,20 +1095,6 @@ uint64_t ManagedScriptSystem::UsedHeapSize() const
 	return mono_gc_get_used_size();
 }
 
-class ManagedCompiler *ManagedScriptSystem::CreateCompiler(const std::string& cbin)
-{
-	ManagedCompiler* c = new ManagedCompiler();
-	c->m_sys = this;
-	c->m_ctx = CreateContext(cbin.c_str());
-	c->Setup();
-	return c;
-}
-
-void ManagedScriptSystem::DestroyCompiler(ManagedCompiler *c)
-{
-	DestroyContext(c->m_ctx);
-}
-
 void ManagedScriptSystem::RegisterNativeFunction(const char *name, void *func)
 {
 	mono_add_internal_call(name, func);
@@ -1160,58 +1146,6 @@ void ManagedScriptSystem::SetProfilingSettings(ManagedProfilingSettings_t settin
 	if(m_profilingSettings.profileAllocations) {
 		mono_profiler_enable_allocations();
 	}
-}
-
-
-//================================================================//
-//
-// Managed Compiler
-//
-//================================================================//
-
-ManagedCompiler::ManagedCompiler()
-{
-
-}
-
-ManagedCompiler::~ManagedCompiler()
-{
-
-}
-
-void ManagedCompiler::Setup()
-{
-	m_compilerClass = m_ctx->FindClass("ScriptCompiler", "Compiler");
-	m_compileMethod = m_compilerClass->FindMethod("Compile");
-}
-
-
-bool ManagedCompiler::Compile(const std::string &buildDir, const std::string &outFile, int langVer)
-{
-	MonoString* outFileString = mono_string_new_len(m_ctx->m_domain, outFile.c_str(), outFile.length());
-	MonoString* buildDirString = mono_string_new_len(m_ctx->m_domain, buildDir.c_str(), buildDir.length());
-
-	assert(outFileString);
-	assert(buildDirString);
-
-	void* params[] = {
-		&outFileString,
-		&buildDirString,
-		&langVer
-	};
-	MonoObject* exception = nullptr;
-	MonoObject* ret = mono_runtime_invoke(m_compileMethod->RawMethod(), nullptr, params, nullptr);
-
-	if(exception) {
-		printf("Invocation of ScriptCompiler::Compiler::Compile failed due to exception\n");
-
-	} else {
-		mono_free(outFileString);
-		mono_free(buildDirString);
-	}
-
-
-	return ret != nullptr;
 }
 
 static void Profiler_RuntimeInit(MonoProfiler* prof)

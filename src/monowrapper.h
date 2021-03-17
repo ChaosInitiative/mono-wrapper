@@ -621,9 +621,6 @@ public:
 
 	uint64_t UsedHeapSize() const;
 
-	class ManagedCompiler* CreateCompiler(const std::string& pathToCompilerBinary);
-	void DestroyCompiler(ManagedCompiler* c);
-
 	void RegisterNativeFunction(const char* name, void* func);
 
 	void ReportProfileStats();
@@ -641,25 +638,4 @@ public:
 	void PushProfilingContext();
 	void PopProfilingContext();
 	inline ManagedProfilingData_t &CurrentProfilingData() { return *m_curFrame; }; // This needs to be fast
-};
-
-//==============================================================================================//
-// ManagedCompiler
-//      Handles the compilation of new code
-//==============================================================================================//
-class ManagedCompiler
-{
-private:
-	ManagedScriptContext* m_ctx;
-	ManagedScriptSystem* m_sys;
-	ManagedClass* m_compilerClass;
-	ManagedMethod* m_compileMethod;
-	friend ManagedScriptSystem;
-protected:
-	ManagedCompiler();
-	~ManagedCompiler();
-	void Setup();
-public:
-	bool Compile(const std::string& buildDir, const std::string& outDir, int langVer);
-
 };
