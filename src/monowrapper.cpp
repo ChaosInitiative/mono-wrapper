@@ -20,6 +20,10 @@
 #include <assert.h>
 #include <string.h>
 
+#ifndef ASSERT 
+#define ASSERT(x) assert(x)
+#endif
+
 MonoDomain* g_jitDomain;
 
 struct _MonoProfiler {
@@ -60,9 +64,9 @@ ManagedAssembly::ManagedAssembly(ManagedScriptContext* ctx, const std::string& n
 
 void ManagedAssembly::PopulateReflectionInfo()
 {
-	assert(m_ctx);
-	assert(m_image);
-	assert(m_assembly);
+	ASSERT(m_ctx);
+	ASSERT(m_image);
+	ASSERT(m_assembly);
 	if(m_populated) return;
 	m_populated = true;
 	const MonoTableInfo* tab = mono_image_get_table_info(m_image, MONO_TABLE_TYPEDEF);
@@ -79,9 +83,9 @@ void ManagedAssembly::PopulateReflectionInfo()
 /* NOTE: No info is cached here because it should be called sparingly! */
 void ManagedAssembly::GetReferencedTypes(std::vector<std::string>& refList)
 {
-	assert(m_ctx);
-	assert(m_image);
-	assert(m_assembly);
+	ASSERT(m_ctx);
+	ASSERT(m_image);
+	ASSERT(m_assembly);
 
 	const MonoTableInfo* tab = mono_image_get_table_info(m_image, MONO_TABLE_TYPEREF);
 	int rows = mono_table_info_get_rows(tab);
@@ -190,7 +194,7 @@ ManagedMethod::ManagedMethod(MonoMethod *method, ManagedClass *cls) :
 	m_class = cls;
 	if(m_token) {
 		m_signature = mono_method_get_signature(m_method, m_class->m_assembly->m_image, m_token);
-		assert(m_signature);
+		ASSERT(m_signature);
 	}
 
 	m_name = mono_method_get_name(m_method);
@@ -428,7 +432,7 @@ ManagedClass::~ManagedClass()
 
 void ManagedClass::PopulateReflectionInfo()
 {
-	assert(!m_valid);
+	ASSERT(!m_valid);
 	if(m_valid) return;
 	void *iter = nullptr;
 
@@ -1042,7 +1046,7 @@ ManagedScriptSystem::ManagedScriptSystem(ManagedScriptSystemSettings_t settings)
 	g_jitDomain = mono_jit_init("abcd");
 	if(!g_jitDomain) {
 		printf("Failure while creating mono jit!\n");
-		assert(0);
+		ASSERT(0);
 		abort();
 	}
 
@@ -1051,7 +1055,7 @@ ManagedScriptSystem::ManagedScriptSystem(ManagedScriptSystemSettings_t settings)
 ManagedScriptSystem::~ManagedScriptSystem()
 {
 	// contexts should be freed before shutdown
-	//assert(m_contexts.size() == 0);
+	//ASSERT(m_contexts.size() == 0);
 	for(auto c : m_contexts) {
 		delete (c);
 	}
