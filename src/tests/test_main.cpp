@@ -1,6 +1,5 @@
 
 /* Mono includes */
-#include "metrics.hpp"
 #include "monowrapper.h"
 #include <mono/jit/jit.h>
 #include <mono/metadata/assembly.h>
@@ -24,8 +23,6 @@
 
 unsigned int util::PassedTests = 0;
 unsigned int util::TotalTests = 0;
-
-ResourceContext* g_resourceContext = new ResourceContext();
 
 struct TestContext_t
 {
@@ -81,8 +78,6 @@ int main(int argc, char** argv)
 	RunSimpleReturnTest(context);
 	RunObjectTest(context);
 	RunComplexObjectTest(context);
-
-	g_resourceContext->Report();
 }
 
 static void LoadTestDLL(TestContext_t& context)
