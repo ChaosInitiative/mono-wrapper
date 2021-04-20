@@ -307,7 +307,7 @@ bool ManagedMethod::MatchSignature()
 MonoObject *ManagedMethod::Invoke(ManagedObject *obj, void **params, MonoObject** _exc)
 {
 	MonoObject * exception = nullptr;
-	MonoObject* o = mono_runtime_invoke(m_method, obj, params, _exc ? _exc : &exception);
+	MonoObject* o = mono_runtime_invoke(m_method, obj->RawObject(), params, _exc ? _exc : &exception);
 
 	if(exception) {
 		m_class->m_assembly->ReportException(exception);
@@ -631,6 +631,40 @@ bool ManagedClass::IsBool()
 //
 //================================================================//
 
+ManagedObject::ManagedObject(MonoObject* obj, class ManagedClass* cls, EManagedObjectHandleType type)
+{
+	m_obj = obj;
+	m_class = cls;
+	switch(type)
+	{
+		case EManagedObjectHandleType::HANDLE:
+			m_gcHandle = mono_gchandle_new(obj, false);
+			m_getObject = [this]() -> MonoObject* {
+				return mono_gchandle_get_target(this->m_gcHandle);
+			};
+			break;
+		case EManagedObjectHandleType::HANDLE_PINNED:
+			m_gcHandle = mono_gchandle_new(obj, true);
+			m_getObject = [this]() -> MonoObject* {
+				return this->m_obj;
+			};
+			break;
+		case EManagedObjectHandleType::WEAKREF:
+			m_gcHandle = mono_gchandle_new_weakref(obj, false);
+			m_getObject = [this]() -> MonoObject* {
+				return mono_gchandle_get_target(this->m_gcHandle);
+			};
+			break;
+		default:
+			break;
+	}
+}
+
+ManagedObject::~ManagedObject()
+{
+	mono_gchandle_free(m_gcHandle);
+}
+
 bool ManagedObject::SetProperty(struct ManagedProperty *prop, void *value)
 {
 	MonoObject * exception = nullptr;
@@ -639,15 +673,16 @@ bool ManagedObject::SetProperty(struct ManagedProperty *prop, void *value)
 	if(!prop->m_setMethod)
 		return false;
 
-	MonoObject* res = mono_runtime_invoke(prop->m_setMethod, m_obj, params, &exception);
+	MonoObject* res = mono_runtime_invoke(prop->m_setMethod, RawObject(), params, &exception);
 
-	if(exception) return false;
+	if(exception) 
+		return false;
 	return true;
 }
 
 bool ManagedObject::SetField(struct ManagedField *prop, void *value)
 {
-	mono_field_set_value(m_obj, prop->RawField(), value);
+	mono_field_set_value(RawObject(), prop->RawField(), value);
 	return true;
 }
 
@@ -659,7 +694,7 @@ bool ManagedObject::GetProperty(struct ManagedProperty *prop, void **outValue)
 	if(!prop->m_getMethod)
 		return false;
 
-	MonoObject* res = mono_runtime_invoke(prop->m_getMethod, m_obj, NULL, &exception);
+	MonoObject* res = mono_runtime_invoke(prop->m_getMethod, RawObject(), NULL, &exception);
 
 	if(!res || exception) {
 		return false;
@@ -671,7 +706,7 @@ bool ManagedObject::GetProperty(struct ManagedProperty *prop, void **outValue)
 
 bool ManagedObject::GetField(struct ManagedField *prop, void *outValue)
 {
-	mono_field_get_value(m_obj, prop->RawField(), outValue);
+	mono_field_get_value(RawObject(), prop->RawField(), outValue);
 	return true;
 }
 

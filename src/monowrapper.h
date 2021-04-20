@@ -9,6 +9,7 @@
 #include <list>
 #include <functional>
 #include <stack>
+#include <memory>
 
 /* Mono includes */
 #include <mono/metadata/mono-config.h>
@@ -203,6 +204,28 @@ public:
 	const std::string& Name() const;
 };
 
+//==============================================================================================//
+// ManagedObjectType
+//		The type of managed object it should be 
+//==============================================================================================//
+enum class EManagedObjectHandleType
+{
+	/**
+	 * Generic default handle type. Backed by mono_gchandle_new, but is not pinned
+	 * Since the address may change, accesses require calls into the mono api which may incur overhead 
+	 */
+	HANDLE = 0,
+	/**
+	 * Generic default handle type, but pinned. Backed by mono_gchandle_new, but pinned.
+	 * Requires no calls into the mono api for accesses, so no overhead for accesses or modifications
+	 */
+	HANDLE_PINNED = 1,
+	/**
+	 * Weak reference handle type. Objects pointed to by weak handles may have their memory reclaimed 
+	 * by the GC. As such, mono api calls are required to obtain the actual object's address on access
+	 */
+	WEAKREF = 2,
+};
 
 //==============================================================================================//
 // ManagedObject
@@ -210,11 +233,16 @@ public:
 //      Unlike the other classes here, the managed object can be copied around. It's just a
 //      wrapper around a MonoObject.
 //==============================================================================================//
+using ManagedObjectHandle = uint32_t;
 class ManagedObject : public ManagedBase<ManagedObject>
 {
 private:
 	MonoObject* m_obj;
 	class ManagedClass* m_class;
+	uint32_t m_gcHandle = 0;
+	EManagedObjectHandleType m_handleType = EManagedObjectHandleType::HANDLE_PINNED;
+	
+	std::function<MonoObject*()> m_getObject;
 
 	friend class ManagedClass;
 	friend class ManagedMethod;
@@ -225,15 +253,16 @@ public:
 	ManagedObject(const ManagedObject& other) = delete;
 	ManagedObject(ManagedObject&& other) = delete;
 
-	explicit ManagedObject(MonoObject* obj, class ManagedClass* cls)
-	{
-		m_obj = obj;
-		m_class = cls;
-	}
+	explicit ManagedObject(MonoObject* obj, class ManagedClass* cls, EManagedObjectHandleType type = EManagedObjectHandleType::HANDLE_PINNED);
+	~ManagedObject();
 
 	const ManagedClass& Class() const { return *m_class; }
 
-	const MonoObject* RawObject() const { return m_obj; }
+	const MonoObject* RawObject() const { return m_getObject(); };
+	MonoObject* RawObject() { return m_getObject(); };
+	
+	ManagedObjectHandle Handle() { return m_gcHandle; };
+	EManagedObjectHandleType HandleType() { return m_handleType; };
 
 	bool SetProperty(class ManagedProperty* prop, void* value);
 	bool SetField(class ManagedField* prop, void* value);
@@ -246,7 +275,6 @@ public:
 	bool GetField(const std::string&p, void* outValue);
 
 	MonoObject* Invoke(class ManagedMethod* method, void** params);
-
 };
 
 //==============================================================================================//
