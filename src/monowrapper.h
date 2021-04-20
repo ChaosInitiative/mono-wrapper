@@ -225,6 +225,11 @@ class ManagedType : public ManagedBase<ManagedType>
 	bool Equals(const ManagedType* other) const;
 
 	const std::string& Name() const;
+
+	inline MonoType* RawType() const
+	{
+		return m_type;
+	}
 };
 
 //==============================================================================================//
@@ -279,7 +284,7 @@ class ManagedObject : public ManagedBase<ManagedObject>
 	ManagedObject(const ManagedObject& other) = delete;
 	ManagedObject(ManagedObject&& other) = delete;
 
-	explicit ManagedObject(MonoObject* obj, class ManagedClass* cls,
+	explicit ManagedObject(MonoObject* obj, class ManagedClass& cls,
 						   EManagedObjectHandleType type = EManagedObjectHandleType::HANDLE_PINNED);
 	~ManagedObject();
 
@@ -297,19 +302,20 @@ class ManagedObject : public ManagedBase<ManagedObject>
 		return m_getObject();
 	};
 
-	ManagedObjectHandle Handle()
+	ManagedObjectHandle GCHandle()
 	{
 		return m_gcHandle;
 	};
-	EManagedObjectHandleType HandleType()
+
+	EManagedObjectHandleType GCHandleType()
 	{
 		return m_handleType;
 	};
 
-	bool SetProperty(class ManagedProperty* prop, void* value);
-	bool SetField(class ManagedField* prop, void* value);
-	bool GetProperty(class ManagedProperty* prop, void** outValue);
-	bool GetField(class ManagedField* prop, void* outValue);
+	bool SetProperty(class ManagedProperty& prop, void* value);
+	bool SetField(class ManagedField& prop, void* value);
+	bool GetProperty(class ManagedProperty& prop, void** outValue);
+	bool GetField(class ManagedField& prop, void* outValue);
 
 	bool SetProperty(const std::string& p, void* value);
 	bool SetField(const std::string& p, void* value);
@@ -360,9 +366,9 @@ class ManagedMethod : public ManagedBase<ManagedMethod>
 	void InvalidateHandle() override;
 
   public:
-	ManagedAssembly* Assembly() const;
+	ManagedAssembly& Assembly() const;
 
-	ManagedClass* Class() const;
+	ManagedClass& Class() const;
 
 	const std::vector<ManagedObject*>& Attributes() const
 	{
@@ -399,8 +405,8 @@ class ManagedMethod : public ManagedBase<ManagedMethod>
 class ManagedField : public ManagedBase<ManagedField>
 {
   private:
-	MonoClassField* m_field;
-	class ManagedClass* m_class;
+	MonoClassField& m_field;
+	class ManagedClass& m_class;
 	std::string m_name;
 
   public:
@@ -408,11 +414,12 @@ class ManagedField : public ManagedBase<ManagedField>
 	ManagedField(ManagedField&) = delete;
 	ManagedField(ManagedField&&) = delete;
 
-	ManagedClass* Class() const
+	inline ManagedClass& Class() const
 	{
 		return m_class;
 	};
-	MonoClassField* RawField() const
+
+	inline MonoClassField& RawField() const
 	{
 		return m_field;
 	};
@@ -422,7 +429,7 @@ class ManagedField : public ManagedBase<ManagedField>
 	}
 
   protected:
-	explicit ManagedField(MonoClassField* fld, class ManagedClass* cls);
+	explicit ManagedField(MonoClassField& fld, class ManagedClass& cls);
 	~ManagedField();
 
 	friend class ManagedClass;
@@ -438,7 +445,7 @@ class ManagedProperty : public ManagedBase<ManagedProperty>
 {
   private:
 	MonoProperty* m_property;
-	class ManagedClass* m_class;
+	class ManagedClass& m_class;
 	std::string m_name;
 	MonoMethod* m_getMethod;
 	MonoMethod* m_setMethod;
@@ -449,7 +456,7 @@ class ManagedProperty : public ManagedBase<ManagedProperty>
 	ManagedProperty(ManagedProperty&&) = delete;
 
   protected:
-	ManagedProperty(MonoProperty* prop, ManagedClass* cls);
+	ManagedProperty(MonoProperty& prop, ManagedClass& cls);
 	~ManagedProperty();
 
 	friend class ManagedClass;
@@ -464,7 +471,7 @@ class ManagedProperty : public ManagedBase<ManagedProperty>
 
 	const ManagedClass& Class() const
 	{
-		return *m_class;
+		return m_class;
 	}
 };
 
@@ -571,9 +578,9 @@ class ManagedClass : public ManagedBase<ManagedClass>
 
 	ManagedObject* CreateInstance(std::vector<MonoType*> signature, void** params);
 
-	bool ImplementsInterface(ManagedClass* interface);
-	bool DerivedFromClass(ManagedClass* cls);
-	bool DerivedFromClass(MonoClass* cls);
+	bool ImplementsInterface(ManagedClass& interface);
+	bool DerivedFromClass(ManagedClass& cls);
+	bool DerivedFromClass(MonoClass& cls);
 
 	inline bool IsVoid();
 	inline bool IsInt16();
@@ -638,7 +645,7 @@ class ManagedScriptContext
 	 * function */
 	ManagedClass* FindClass(const std::string& ns, const std::string& cls);
 
-	ManagedClass* FindClass(ManagedAssembly* assembly, const std::string& ns, const std::string& cls);
+	ManagedClass* FindClass(ManagedAssembly& assembly, const std::string& ns, const std::string& cls);
 
 	/* Returns a pointer to a raw MonoClass object corresponding to the
 	 * specified class */
@@ -656,7 +663,7 @@ class ManagedScriptContext
 
 	bool ValidateAgainstWhitelist(const std::vector<std::string>& whitelist);
 
-	void ReportException(MonoObject* obj, ManagedAssembly* ass);
+	void ReportException(MonoObject& obj, ManagedAssembly& ass);
 
 	void RegisterExceptionCallback(ExceptionCallbackT callback)
 	{

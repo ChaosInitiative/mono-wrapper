@@ -56,9 +56,6 @@ ManagedAssembly::ManagedAssembly(ManagedScriptContext* ctx, const std::string& n
 
 void ManagedAssembly::PopulateReflectionInfo()
 {
-	ASSERT(m_ctx);
-	ASSERT(m_image);
-	ASSERT(m_assembly);
 	if (m_populated)
 		return;
 	m_populated = true;
@@ -76,10 +73,6 @@ void ManagedAssembly::PopulateReflectionInfo()
 /* NOTE: No info is cached here because it should be called sparingly! */
 void ManagedAssembly::GetReferencedTypes(std::vector<std::string>& refList)
 {
-	ASSERT(m_ctx);
-	ASSERT(m_image);
-	ASSERT(m_assembly);
-
 	const MonoTableInfo* tab = mono_image_get_table_info(m_image, MONO_TABLE_TYPEREF);
 	int rows = mono_table_info_get_rows(tab);
 	/* Parse all of the referenced types, and add them to the refList */
@@ -136,7 +129,7 @@ void ManagedAssembly::InvalidateHandle()
 
 void ManagedAssembly::ReportException(MonoObject* exc)
 {
-	m_ctx->ReportException(exc, this);
+	m_ctx->ReportException(*exc, *this);
 }
 
 //================================================================//
@@ -191,10 +184,6 @@ ManagedMethod::ManagedMethod(MonoMethod* method, ManagedClass* cls) : m_populate
 	m_paramCount = mono_signature_get_param_count(m_signature);
 
 	m_returnType = new ManagedType(mono_signature_get_return_type(m_signature));
-
-	if (!m_attrInfo) {
-		return;
-	}
 }
 
 ManagedMethod::~ManagedMethod()
@@ -209,14 +198,14 @@ ManagedMethod::~ManagedMethod()
 	m_params.clear();
 }
 
-ManagedAssembly* ManagedMethod::Assembly() const
+ManagedAssembly& ManagedMethod::Assembly() const
 {
-	return m_class->m_assembly;
+	return *m_class->m_assembly;
 }
 
-ManagedClass* ManagedMethod::Class() const
+ManagedClass& ManagedMethod::Class() const
 {
-	return m_class;
+	return *m_class;
 }
 
 void ManagedMethod::InvalidateHandle()
@@ -320,9 +309,9 @@ MonoObject* ManagedMethod::InvokeStatic(void** params, MonoObject** _exc)
 //
 //================================================================//
 
-ManagedField::ManagedField(MonoClassField* fld, class ManagedClass* cls) : m_class(cls), m_field(fld)
+ManagedField::ManagedField(MonoClassField& fld, ManagedClass& cls) : m_class(cls), m_field(fld)
 {
-	const char* n = mono_field_get_name(fld);
+	const char* n = mono_field_get_name(&fld);
 	m_name = n;
 }
 
@@ -336,12 +325,12 @@ ManagedField::~ManagedField()
 //
 //================================================================//
 
-ManagedProperty::ManagedProperty(MonoProperty* prop, ManagedClass* cls) : m_class(cls), m_property(prop)
+ManagedProperty::ManagedProperty(MonoProperty& prop, ManagedClass& cls) : m_class(cls), m_property(&prop)
 {
-	const char* n = mono_property_get_name(prop);
+	const char* n = mono_property_get_name(m_property);
 	m_name = n;
-	m_getMethod = mono_property_get_get_method(prop);
-	m_setMethod = mono_property_get_set_method(prop);
+	m_getMethod = mono_property_get_get_method(m_property);
+	m_setMethod = mono_property_get_set_method(m_property);
 }
 
 ManagedProperty::~ManagedProperty()
@@ -366,7 +355,10 @@ ManagedClass::ManagedClass(ManagedAssembly* assembly, const std::string& ns, con
 	/* If there is no class name or namespace, something is fucky */
 	if (!cls.empty() && m_attrInfo) {
 		if (mono_custom_attrs_has_attr(m_attrInfo, m_class)) {
-			m_attributes.push_back(new ManagedObject(mono_custom_attrs_get_attr(m_attrInfo, m_class), this));
+			auto obj = mono_custom_attrs_get_attr(m_attrInfo, m_class);
+			if (!obj)
+				return;
+			m_attributes.push_back(new ManagedObject(obj, *this));
 		}
 	}
 
@@ -382,7 +374,10 @@ ManagedClass::ManagedClass(ManagedAssembly* assembly, MonoClass* _cls, const std
 	/* If there is no class name or namespace, something is fucky */
 	if (!cls.empty() && m_attrInfo) {
 		if (mono_custom_attrs_has_attr(m_attrInfo, m_class)) {
-			m_attributes.push_back(new ManagedObject(mono_custom_attrs_get_attr(m_attrInfo, m_class), this));
+			auto obj = mono_custom_attrs_get_attr(m_attrInfo, m_class);
+			if (!obj)
+				return;
+			m_attributes.push_back(new ManagedObject(obj, *this));
 		}
 	}
 
@@ -419,13 +414,13 @@ void ManagedClass::PopulateReflectionInfo()
 	MonoClassField* field;
 	iter = nullptr;
 	while ((field = mono_class_get_fields(m_class, &iter))) {
-		m_fields.push_back(new ManagedField(field, this));
+		m_fields.push_back(new ManagedField(*field, *this));
 	}
 
 	MonoProperty* props;
 	iter = nullptr;
 	while ((props = mono_class_get_properties(m_class, &iter))) {
-		m_properties.push_back(new ManagedProperty(props, this));
+		m_properties.push_back(new ManagedProperty(*props, *this));
 	}
 
 	m_populated = true;
@@ -483,10 +478,10 @@ ManagedObject* ManagedClass::CreateInstance(std::vector<MonoType*> signature, vo
 				mono_runtime_invoke(method->m_method, obj, params, &exception);
 			}
 			if (exception || !obj) {
-				m_assembly->m_ctx->ReportException(obj, m_assembly);
+				m_assembly->m_ctx->ReportException(*obj, *m_assembly);
 				return nullptr;
 			}
-			return new ManagedObject(obj, this);
+			return new ManagedObject(obj, *this);
 		}
 	}
 
@@ -498,19 +493,19 @@ mono_byte ManagedClass::NumConstructors() const
 	return m_numConstructors;
 }
 
-bool ManagedClass::ImplementsInterface(ManagedClass* interface)
+bool ManagedClass::ImplementsInterface(ManagedClass& interface)
 {
-	return mono_class_implements_interface(m_class, interface->m_class);
+	return mono_class_implements_interface(m_class, interface.m_class);
 }
 
-bool ManagedClass::DerivedFromClass(ManagedClass* cls)
+bool ManagedClass::DerivedFromClass(ManagedClass& cls)
 {
-	return mono_class_is_subclass_of(m_class, cls->m_class, true);
+	return mono_class_is_subclass_of(m_class, cls.m_class, true);
 }
 
-bool ManagedClass::DerivedFromClass(MonoClass* cls)
+bool ManagedClass::DerivedFromClass(MonoClass& cls)
 {
-	return mono_class_is_subclass_of(m_class, cls, true);
+	return mono_class_is_subclass_of(m_class, &cls, true);
 }
 
 bool ManagedClass::IsVoid()
@@ -594,10 +589,10 @@ bool ManagedClass::IsBool()
 //
 //================================================================//
 
-ManagedObject::ManagedObject(MonoObject* obj, class ManagedClass* cls, EManagedObjectHandleType type)
+ManagedObject::ManagedObject(MonoObject* obj, ManagedClass& cls, EManagedObjectHandleType type)
 {
 	m_obj = obj;
-	m_class = cls;
+	m_class = &cls;
 	switch (type) {
 	case EManagedObjectHandleType::HANDLE:
 		m_gcHandle = mono_gchandle_new(obj, false);
@@ -621,36 +616,36 @@ ManagedObject::~ManagedObject()
 	mono_gchandle_free(m_gcHandle);
 }
 
-bool ManagedObject::SetProperty(struct ManagedProperty* prop, void* value)
+bool ManagedObject::SetProperty(ManagedProperty& prop, void* value)
 {
 	MonoObject* exception = nullptr;
 	void* params[] = {value};
 
-	if (!prop->m_setMethod)
+	if (!prop.m_setMethod)
 		return false;
 
-	MonoObject* res = mono_runtime_invoke(prop->m_setMethod, RawObject(), params, &exception);
+	MonoObject* res = mono_runtime_invoke(prop.m_setMethod, RawObject(), params, &exception);
 
 	if (exception)
 		return false;
 	return true;
 }
 
-bool ManagedObject::SetField(struct ManagedField* prop, void* value)
+bool ManagedObject::SetField(ManagedField& prop, void* value)
 {
-	mono_field_set_value(RawObject(), prop->RawField(), value);
+	mono_field_set_value(RawObject(), &prop.RawField(), value);
 	return true;
 }
 
-bool ManagedObject::GetProperty(struct ManagedProperty* prop, void** outValue)
+bool ManagedObject::GetProperty(ManagedProperty& prop, void** outValue)
 {
 	MonoObject* exception = nullptr;
 	void* params[] = {outValue};
 
-	if (!prop->m_getMethod)
+	if (!prop.m_getMethod)
 		return false;
 
-	MonoObject* res = mono_runtime_invoke(prop->m_getMethod, RawObject(), NULL, &exception);
+	MonoObject* res = mono_runtime_invoke(prop.m_getMethod, RawObject(), NULL, &exception);
 
 	if (!res || exception) {
 		return false;
@@ -660,9 +655,9 @@ bool ManagedObject::GetProperty(struct ManagedProperty* prop, void** outValue)
 	return true;
 }
 
-bool ManagedObject::GetField(struct ManagedField* prop, void* outValue)
+bool ManagedObject::GetField(ManagedField& prop, void* outValue)
 {
-	mono_field_get_value(RawObject(), prop->RawField(), outValue);
+	mono_field_get_value(RawObject(), &prop.RawField(), outValue);
 	return true;
 }
 
@@ -670,7 +665,7 @@ bool ManagedObject::SetProperty(const std::string& p, void* value)
 {
 	for (auto prop : m_class->m_properties) {
 		if (p == prop->m_name) {
-			return this->SetProperty(prop, value);
+			return this->SetProperty(*prop, value);
 		}
 	}
 	return false;
@@ -680,7 +675,7 @@ bool ManagedObject::SetField(const std::string& p, void* value)
 {
 	for (auto& f : m_class->m_fields) {
 		if (f->m_name == p) {
-			return this->SetField(f, value);
+			return this->SetField(*f, value);
 		}
 	}
 	return false;
@@ -690,7 +685,7 @@ bool ManagedObject::GetProperty(const std::string& p, void** outValue)
 {
 	for (auto& prop : m_class->m_properties) {
 		if (prop->m_name == p) {
-			return this->GetProperty(prop, outValue);
+			return this->GetProperty(*prop, outValue);
 		}
 	}
 	return false;
@@ -700,7 +695,7 @@ bool ManagedObject::GetField(const std::string& p, void* outValue)
 {
 	for (auto& f : m_class->m_fields) {
 		if (f->m_name == p) {
-			return this->GetField(f, outValue);
+			return this->GetField(*f, outValue);
 		}
 	}
 	return false;
@@ -797,15 +792,15 @@ ManagedClass* ManagedScriptContext::FindClass(const std::string& ns, const std::
 	/* Also check the hashmap we have setup */
 	for (auto& a : m_loadedAssemblies) {
 		ManagedClass* _cls = nullptr;
-		if ((_cls = FindClass(a, ns, cls)))
+		if (a && (_cls = FindClass(*a, ns, cls)))
 			return _cls;
 	}
 	return nullptr;
 }
 
-ManagedClass* ManagedScriptContext::FindClass(ManagedAssembly* assembly, const std::string& ns, const std::string& cls)
+ManagedClass* ManagedScriptContext::FindClass(ManagedAssembly& assembly, const std::string& ns, const std::string& cls)
 {
-	auto itpair = assembly->m_classes.equal_range(ns);
+	auto itpair = assembly.m_classes.equal_range(ns);
 	for (auto it = itpair.first; it != itpair.second; ++it) {
 		if (it->second->m_className == cls)
 			return it->second;
@@ -813,10 +808,10 @@ ManagedClass* ManagedScriptContext::FindClass(ManagedAssembly* assembly, const s
 
 	/* Have mono perform the class lookup. If it's there, create and add a new
 	 * managed class */
-	MonoClass* monoClass = mono_class_from_name(assembly->m_image, ns.c_str(), cls.c_str());
+	MonoClass* monoClass = mono_class_from_name(assembly.m_image, ns.c_str(), cls.c_str());
 	if (monoClass) {
-		ManagedClass* _class = new ManagedClass(assembly, monoClass, ns, cls);
-		assembly->m_classes.insert({ns, _class});
+		ManagedClass* _class = new ManagedClass(&assembly, monoClass, ns, cls);
+		assembly.m_classes.insert({ns, _class});
 		return _class;
 	}
 
@@ -906,12 +901,12 @@ bool ManagedScriptContext::ValidateAgainstWhitelist(const std::vector<std::strin
 	return true;
 }
 
-void ManagedScriptContext::ReportException(MonoObject* obj, ManagedAssembly* ass)
+void ManagedScriptContext::ReportException(MonoObject& obj, ManagedAssembly& ass)
 {
-	auto exc = this->GetExceptionDescriptor(obj);
+	auto exc = this->GetExceptionDescriptor(&obj);
 
 	for (auto& c : m_callbacks) {
-		c(this, ass, obj, exc);
+		c(this, &ass, &obj, exc);
 	}
 }
 
@@ -1037,8 +1032,6 @@ ManagedScriptSystem::ManagedScriptSystem(ManagedScriptSystemSettings_t settings)
 
 ManagedScriptSystem::~ManagedScriptSystem()
 {
-	// contexts should be freed before shutdown
-	// ASSERT(m_contexts.size() == 0);
 	for (auto c : m_contexts) {
 		delete (c);
 	}
