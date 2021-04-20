@@ -1,7 +1,7 @@
 [*]
 end_of_line = lf
-indent_size = 8
+indent_size = 4
 indent_style = tab
 root = true
-tab_width = 8
+tab_width = 4
 charset = utf-8
