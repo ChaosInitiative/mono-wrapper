@@ -20,52 +20,47 @@
 #include <mono/metadata/mono-gc.h>
 #include <mono/metadata/object.h>
 
+namespace mono {
+
 template <class T> class ManagedBase;
 
 template <class T> class ManagedHandle
 {
-  private:
+private:
 	T* m_object;
 	bool m_valid;
 
-  protected:
-	void Invalidate()
-	{
+protected:
+	void Invalidate() {
 		m_valid = false;
 	}
-	void Validate()
-	{
+	void Validate() {
 		m_valid = true;
 	}
 	friend T;
 	friend ManagedBase<T>;
 
-  public:
-	ManagedHandle(T* obj) : m_object(obj), m_valid(false)
-	{
+public:
+	ManagedHandle(T* obj) : m_object(obj), m_valid(false) {
 		m_object->AttachHandle(this);
 	}
 
-	~ManagedHandle()
-	{
+	virtual ~ManagedHandle() {
 		if (m_object && m_valid)
 			m_object->DetachHandle(this);
 	}
 
 	ManagedHandle() = delete;
 
-	bool Valid() const
-	{
+	bool Valid() const {
 		return m_valid;
 	}
 
-	T& operator*()
-	{
+	T& operator*() {
 		return *m_object;
 	};
 
-	T& operator->()
-	{
+	T& operator->() {
 		return *m_object;
 	}
 };
@@ -86,21 +81,19 @@ struct ManagedException_t
 //==============================================================================================//
 template <class T> class ManagedBase
 {
-  protected:
+protected:
 	friend ManagedHandle<T>;
 
-  protected:
+protected:
 	typedef ManagedHandle<T>* HandleT;
 
 	HandleT m_handle;
 	bool m_valid;
 
-	ManagedBase() : m_handle(nullptr), m_valid(false)
-	{
+	ManagedBase() : m_handle(nullptr), m_valid(false) {
 	}
 
-	void AttachHandle(HandleT handle)
-	{
+	void AttachHandle(HandleT handle) {
 		handle->Validate();
 		m_handle = handle;
 		if (m_valid)
@@ -109,21 +102,18 @@ template <class T> class ManagedBase
 			m_handle->Invalidate();
 	}
 
-	void DetachHandle(HandleT handle)
-	{
+	void DetachHandle(HandleT handle) {
 		handle->Invalidate();
 		m_handle = nullptr;
 	}
 
-	virtual void InvalidateHandle()
-	{
+	virtual void InvalidateHandle() {
 		if (m_handle)
 			m_handle->Invalidate();
 		m_valid = false;
 	}
 
-	virtual void ValidateHandle()
-	{
+	virtual void ValidateHandle() {
 		if (m_handle)
 			m_handle->Validate();
 		m_valid = true;
@@ -136,10 +126,10 @@ template <class T> class ManagedBase
 //==============================================================================================//
 class ManagedAssembly : public ManagedBase<ManagedAssembly>
 {
-  private:
+private:
 	typedef ManagedHandle<ManagedAssembly>* HandleT;
 
-  private:
+private:
 	MonoAssembly* m_assembly;
 	MonoImage* m_image;
 	std::string m_path;
@@ -147,14 +137,15 @@ class ManagedAssembly : public ManagedBase<ManagedAssembly>
 	bool m_populated;
 	class ManagedScriptContext* m_ctx;
 
-  public:
+public:
 	ManagedAssembly() = delete;
 	ManagedAssembly(ManagedAssembly&) = delete;
 	ManagedAssembly(ManagedAssembly&&) = delete;
 
-  protected:
+protected:
 	explicit ManagedAssembly(class ManagedScriptContext* ctx, const std::string& path, MonoImage* img,
 							 MonoAssembly* ass);
+	virtual ~ManagedAssembly() {};
 
 	friend class ManagedScriptContext;
 	friend class ManagedClass;
@@ -163,7 +154,7 @@ class ManagedAssembly : public ManagedBase<ManagedAssembly>
 	void PopulateReflectionInfo();
 	void DisposeReflectionInfo();
 
-  public:
+public:
 	void GetReferencedTypes(std::vector<std::string>& refList);
 
 	bool ValidateAgainstWhitelist(const std::vector<std::string>& whiteList);
@@ -182,7 +173,7 @@ class ManagedAssembly : public ManagedBase<ManagedAssembly>
 //==============================================================================================//
 class ManagedType : public ManagedBase<ManagedType>
 {
-  private:
+private:
 	MonoType* m_type;
 	bool m_isStruct : 1;
 	bool m_isVoid : 1;
@@ -190,35 +181,31 @@ class ManagedType : public ManagedBase<ManagedType>
 	bool m_isPtr : 1;
 	std::string m_name;
 
-  public:
+public:
 	ManagedType() = delete;
 	ManagedType(ManagedType&) = delete;
 	ManagedType(ManagedType&&) = delete;
 
-  protected:
+protected:
 	ManagedType(MonoType* type);
 
 	friend class ManagedMethod;
 	friend class ManagedObject;
 
-  public:
-	bool IsStruct() const
-	{
+public:
+	bool IsStruct() const {
 		return m_isStruct;
 	};
 
-	bool IsVoid() const
-	{
+	bool IsVoid() const {
 		return m_isVoid;
 	};
 
-	bool IsRef() const
-	{
+	bool IsRef() const {
 		return m_isRef;
 	};
 
-	bool IsPtr() const
-	{
+	bool IsPtr() const {
 		return m_isPtr;
 	};
 
@@ -226,8 +213,7 @@ class ManagedType : public ManagedBase<ManagedType>
 
 	const std::string& Name() const;
 
-	inline MonoType* RawType() const
-	{
+	inline MonoType* RawType() const {
 		return m_type;
 	}
 };
@@ -267,7 +253,7 @@ enum class EManagedObjectHandleType
 using ManagedObjectHandle = uint32_t;
 class ManagedObject : public ManagedBase<ManagedObject>
 {
-  private:
+private:
 	MonoObject* m_obj;
 	class ManagedClass* m_class;
 	uint32_t m_gcHandle = 0;
@@ -279,7 +265,7 @@ class ManagedObject : public ManagedBase<ManagedObject>
 	friend class ManagedMethod;
 	friend class ManagedScriptContext;
 
-  public:
+public:
 	ManagedObject() = delete;
 	ManagedObject(const ManagedObject& other) = delete;
 	ManagedObject(ManagedObject&& other) = delete;
@@ -288,27 +274,22 @@ class ManagedObject : public ManagedBase<ManagedObject>
 						   EManagedObjectHandleType type = EManagedObjectHandleType::HANDLE_PINNED);
 	~ManagedObject();
 
-	const ManagedClass& Class() const
-	{
+	const ManagedClass& Class() const {
 		return *m_class;
 	}
 
-	const MonoObject* RawObject() const
-	{
+	const MonoObject* RawObject() const {
 		return m_getObject();
 	};
-	MonoObject* RawObject()
-	{
+	MonoObject* RawObject() {
 		return m_getObject();
 	};
 
-	ManagedObjectHandle GCHandle()
-	{
+	ManagedObjectHandle GCHandle() {
 		return m_gcHandle;
 	};
 
-	EManagedObjectHandleType GCHandleType()
-	{
+	EManagedObjectHandleType GCHandleType() {
 		return m_handleType;
 	};
 
@@ -331,7 +312,7 @@ class ManagedObject : public ManagedBase<ManagedObject>
 //==============================================================================================//
 class ManagedMethod : public ManagedBase<ManagedMethod>
 {
-  private:
+private:
 	MonoMethod* m_method;
 	class ManagedClass* m_class;
 	std::vector<class ManagedObject*> m_attributes;
@@ -349,12 +330,12 @@ class ManagedMethod : public ManagedBase<ManagedMethod>
 	friend class ManagedClass;
 	friend ManagedHandle<ManagedMethod>;
 
-  public:
+public:
 	ManagedMethod() = delete;
 	ManagedMethod(ManagedMethod&) = delete;
 	ManagedMethod(ManagedMethod&&) = delete;
 
-  protected:
+protected:
 	explicit ManagedMethod(MonoMethod* method, ManagedClass* cls);
 
 	~ManagedMethod();
@@ -365,28 +346,24 @@ class ManagedMethod : public ManagedBase<ManagedMethod>
 
 	void InvalidateHandle() override;
 
-  public:
+public:
 	ManagedAssembly& Assembly() const;
 
 	ManagedClass& Class() const;
 
-	const std::vector<ManagedObject*>& Attributes() const
-	{
+	const std::vector<ManagedObject*>& Attributes() const {
 		return m_attributes;
 	}
 
-	const std::string& Name() const
-	{
+	const std::string& Name() const {
 		return m_name;
 	};
 
-	int ParamCount() const
-	{
+	int ParamCount() const {
 		return m_paramCount;
 	};
 
-	MonoMethod* RawMethod()
-	{
+	MonoMethod* RawMethod() {
 		return m_method;
 	};
 
@@ -404,31 +381,28 @@ class ManagedMethod : public ManagedBase<ManagedMethod>
 //==============================================================================================//
 class ManagedField : public ManagedBase<ManagedField>
 {
-  private:
+private:
 	MonoClassField& m_field;
 	class ManagedClass& m_class;
 	std::string m_name;
 
-  public:
+public:
 	ManagedField() = delete;
 	ManagedField(ManagedField&) = delete;
 	ManagedField(ManagedField&&) = delete;
 
-	inline ManagedClass& Class() const
-	{
+	inline ManagedClass& Class() const {
 		return m_class;
 	};
 
-	inline MonoClassField& RawField() const
-	{
+	inline MonoClassField& RawField() const {
 		return m_field;
 	};
-	const std::string& Name() const
-	{
+	const std::string& Name() const {
 		return m_name;
 	}
 
-  protected:
+protected:
 	explicit ManagedField(MonoClassField& fld, class ManagedClass& cls);
 	~ManagedField();
 
@@ -443,19 +417,19 @@ class ManagedField : public ManagedBase<ManagedField>
 //==============================================================================================//
 class ManagedProperty : public ManagedBase<ManagedProperty>
 {
-  private:
+private:
 	MonoProperty* m_property;
 	class ManagedClass& m_class;
 	std::string m_name;
 	MonoMethod* m_getMethod;
 	MonoMethod* m_setMethod;
 
-  public:
+public:
 	ManagedProperty() = delete;
 	ManagedProperty(ManagedProperty&) = delete;
 	ManagedProperty(ManagedProperty&&) = delete;
 
-  protected:
+protected:
 	ManagedProperty(MonoProperty& prop, ManagedClass& cls);
 	~ManagedProperty();
 
@@ -463,14 +437,12 @@ class ManagedProperty : public ManagedBase<ManagedProperty>
 	friend class ManagedMethod;
 	friend class ManagedObject;
 
-  public:
-	const MonoProperty* RawProperty() const
-	{
+public:
+	const MonoProperty* RawProperty() const {
 		return m_property;
 	};
 
-	const ManagedClass& Class() const
-	{
+	const ManagedClass& Class() const {
 		return m_class;
 	}
 };
@@ -481,7 +453,7 @@ class ManagedProperty : public ManagedBase<ManagedProperty>
 //==============================================================================================//
 class ManagedClass : public ManagedBase<ManagedClass>
 {
-  private:
+private:
 	std::vector<class ManagedMethod*> m_methods;
 	std::vector<class ManagedField*> m_fields;
 	std::vector<class ManagedObject*> m_attributes;
@@ -507,7 +479,7 @@ class ManagedClass : public ManagedBase<ManagedClass>
 	friend class ManagedAssembly;
 	friend class ManagedObject;
 
-  protected:
+protected:
 	ManagedClass(ManagedAssembly* assembly, const std::string& ns, const std::string& cls);
 	ManagedClass(ManagedAssembly* assembly, MonoClass* _cls, const std::string& ns, const std::string& cls);
 	~ManagedClass();
@@ -516,57 +488,45 @@ class ManagedClass : public ManagedBase<ManagedClass>
 
 	void InvalidateHandle() override;
 
-  public:
+public:
 	ManagedClass() = delete;
 	ManagedClass(ManagedClass&& c) = delete;
 	ManagedClass(ManagedClass&) = delete;
 
-	const std::string& NamespaceName() const
-	{
+	const std::string& NamespaceName() const {
 		return m_namespaceName;
 	};
-	const std::string& ClassName() const
-	{
+	const std::string& ClassName() const {
 		return m_className;
 	};
-	const std::vector<class ManagedMethod*>& Methods() const
-	{
+	const std::vector<class ManagedMethod*>& Methods() const {
 		return m_methods;
 	};
-	const std::vector<class ManagedField*>& Fields() const
-	{
+	const std::vector<class ManagedField*>& Fields() const {
 		return m_fields;
 	};
-	const std::vector<class ManagedObject*>& Attributes() const
-	{
+	const std::vector<class ManagedObject*>& Attributes() const {
 		return m_attributes;
 	};
-	const std::vector<class ManagedProperty*>& Properties() const
-	{
+	const std::vector<class ManagedProperty*>& Properties() const {
 		return m_properties;
 	};
-	uint32_t DataSize() const
-	{
+	uint32_t DataSize() const {
 		return m_size;
 	};
-	bool ValueClass() const
-	{
+	bool ValueClass() const {
 		return m_valueClass;
 	};
-	bool DelegateClass() const
-	{
+	bool DelegateClass() const {
 		return m_delegateClass;
 	};
-	bool EnumClass() const
-	{
+	bool EnumClass() const {
 		return m_enumClass;
 	};
-	bool Nullable() const
-	{
+	bool Nullable() const {
 		return m_nullableClass;
 	};
-	int Alignment() const
-	{
+	int Alignment() const {
 		return m_alignment;
 	};
 
@@ -606,13 +566,13 @@ class ManagedClass : public ManagedBase<ManagedClass>
 //==============================================================================================//
 class ManagedScriptContext
 {
-  public:
+public:
 	std::list<ManagedAssembly*> m_loadedAssemblies;
 	MonoDomain* m_domain;
 	std::string m_baseImage;
 	bool m_initialized = false;
 
-  public:
+public:
 	ManagedScriptContext() = delete;
 	ManagedScriptContext(ManagedScriptContext&) = delete;
 	ManagedScriptContext(ManagedScriptContext&&) = delete;
@@ -623,7 +583,7 @@ class ManagedScriptContext
 	using ExceptionCallbackT =
 		std::function<void(ManagedScriptContext*, ManagedAssembly*, MonoObject*, ManagedException_t)>;
 
-  protected:
+protected:
 	std::vector<ExceptionCallbackT> m_callbacks;
 
 	friend class ManagedScriptSystem;
@@ -633,7 +593,7 @@ class ManagedScriptContext
 
 	void PopulateReflectionInfo();
 
-  public:
+public:
 	bool LoadAssembly(const char* path);
 
 	bool UnloadAssembly(const std::string& name);
@@ -665,13 +625,11 @@ class ManagedScriptContext
 
 	void ReportException(MonoObject& obj, ManagedAssembly& ass);
 
-	void RegisterExceptionCallback(ExceptionCallbackT callback)
-	{
+	void RegisterExceptionCallback(ExceptionCallbackT callback) {
 		m_callbacks.push_back(callback);
 	}
 
-	MonoDomain* RawDomain() const
-	{
+	MonoDomain* RawDomain() const {
 		return m_domain;
 	};
 };
@@ -697,8 +655,7 @@ struct ManagedScriptSystemSettings_t
 	void (*_free)(void* mem);
 	void* (*_calloc)(size_t count, size_t size);
 
-	ManagedScriptSystemSettings_t()
-	{
+	ManagedScriptSystemSettings_t() {
 		_malloc = nullptr;
 		_realloc = nullptr;
 		_free = nullptr;
@@ -740,7 +697,7 @@ struct ManagedProfilingSettings_t
 
 class ManagedScriptSystem
 {
-  private:
+private:
 	std::vector<ManagedScriptContext*> m_contexts;
 	std::stack<ManagedProfilingData_t> m_profilingData;
 	MonoAllocatorVTable m_allocator;
@@ -749,7 +706,7 @@ class ManagedScriptSystem
 	bool m_debugEnabled;
 	ManagedProfilingSettings_t m_profilingSettings;
 
-  public:
+public:
 	explicit ManagedScriptSystem(ManagedScriptSystemSettings_t settings);
 	~ManagedScriptSystem();
 
@@ -762,8 +719,7 @@ class ManagedScriptSystem
 
 	void DestroyContext(ManagedScriptContext* ctx);
 
-	int NumActiveContexts() const
-	{
+	int NumActiveContexts() const {
 		return m_contexts.size();
 	};
 
@@ -776,13 +732,11 @@ class ManagedScriptSystem
 	void ReportProfileStats();
 
 	void EnableDebugging(bool enable);
-	bool IsDebuggingEnabled() const
-	{
+	bool IsDebuggingEnabled() const {
 		return m_debugEnabled;
 	};
 
-	ManagedProfilingSettings_t GetProfilingSettings()
-	{
+	ManagedProfilingSettings_t GetProfilingSettings() {
 		return m_profilingSettings;
 	};
 	void SetProfilingSettings(ManagedProfilingSettings_t settings);
@@ -793,8 +747,9 @@ class ManagedScriptSystem
 
 	void PushProfilingContext();
 	void PopProfilingContext();
-	inline ManagedProfilingData_t& CurrentProfilingData()
-	{
+	inline ManagedProfilingData_t& CurrentProfilingData() {
 		return *m_curFrame;
 	}; // This needs to be fast
 };
+
+} // namespace mono

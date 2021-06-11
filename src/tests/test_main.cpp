@@ -24,6 +24,8 @@
 unsigned int util::PassedTests = 0;
 unsigned int util::TotalTests = 0;
 
+using namespace mono;
+
 struct TestContext_t
 {
 	ManagedScriptSystem* scriptSystem;
@@ -40,8 +42,7 @@ static void RunObjectTest(TestContext_t&);
 static void RunComplexObjectTest(TestContext_t&);
 static void LoadTestDLL(TestContext_t&);
 
-int main(int argc, char** argv)
-{
+int main(int argc, char** argv) {
 	char* monoLibPath = nullptr;
 	if (!(monoLibPath = getenv("MONO_LIB_PATH")))
 		printf("WARNING: MONO_LIB_PATH env var is not set, mono might not be "
@@ -80,8 +81,7 @@ int main(int argc, char** argv)
 	RunComplexObjectTest(context);
 }
 
-static void LoadTestDLL(TestContext_t& context)
-{
+static void LoadTestDLL(TestContext_t& context) {
 	char cwd[512];
 	getcwd(cwd, sizeof(cwd));
 	char fullpath[512];
@@ -95,8 +95,7 @@ static void LoadTestDLL(TestContext_t& context)
 		REPORT_PASS("test1.dll load");
 }
 
-static void RunBasicTest(TestContext_t& context)
-{
+static void RunBasicTest(TestContext_t& context) {
 	context.wrapperTestClass = context.scriptContext->FindClass("WrapperTests", "WrapperTestClass");
 
 	if (!context.wrapperTestClass)
@@ -122,8 +121,7 @@ static void RunBasicTest(TestContext_t& context)
 		REPORT_PASS("WrapperTests.WrapperTestClass.Test1 static method invoke");
 }
 
-static void RunSimpleReturnTest(TestContext_t& context)
-{
+static void RunSimpleReturnTest(TestContext_t& context) {
 	const char* curTest = "WrapperTest.WrapperTestClass.Test1";
 	MonoObject* exc = nullptr;
 	MonoObject* ret = context.test1MethodStatic->InvokeStatic(nullptr, &exc);
@@ -146,10 +144,8 @@ static void RunSimpleReturnTest(TestContext_t& context)
 		REPORT_FAIL("%s returned a non-boolean object", curTest);
 }
 
-static void RunObjectTest(TestContext_t& context)
-{
+static void RunObjectTest(TestContext_t& context) {
 }
 
-static void RunComplexObjectTest(TestContext_t& context)
-{
+static void RunComplexObjectTest(TestContext_t& context) {
 }
